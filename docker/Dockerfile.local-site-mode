@@ -1,0 +1,14 @@
+# 固定官方稳定版镜像，避免资源变化后把偏移应用到未知二进制。
+FROM jxxghp/moviepilot-v3@sha256:1d10be0338d3d93669feac716ead9a094dc06c433fcb8a0ff271f2e07345e341
+
+COPY scripts/patch_local_site_mode.py /tmp/patch_local_site_mode.py
+RUN /opt/venv/bin/python /tmp/patch_local_site_mode.py \
+      /app/app/application/site/sites.cpython-314-x86_64-linux-gnu.so \
+      /tmp/local-sites.so \
+    && cp -p /app/app/application/site/sites.cpython-314-x86_64-linux-gnu.so \
+      /app/app/application/site/sites.cpython-314-x86_64-linux-gnu.so.upstream \
+    && cp -p /tmp/local-sites.so /app/app/application/site/sites.cpython-314-x86_64-linux-gnu.so \
+    && rm /tmp/local-sites.so /tmp/patch_local_site_mode.py
+
+# 资源更新会覆盖本地修改；使用新资源必须重新分析、固定哈希并重新验收。
+ENV AUTO_UPDATE_RESOURCE=false MOVIEPILOT_AUTO_UPDATE=false
