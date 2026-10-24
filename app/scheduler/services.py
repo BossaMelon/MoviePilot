@@ -35,6 +35,7 @@ class SchedulerServices:
     :param process_workflow: 执行指定工作流的任务入口
     :param put_message: 将消息放入异步队列的任务入口
     :param post_message: 发送指定消息的任务入口
+    :param peach_sync: 可选的 Peach 已提交下载完成核实与入库入口
     :param clear_wallpaper_cache: 可选的壁纸缓存清理入口；None 表示未装配
     """
 
@@ -58,3 +59,4 @@ class SchedulerServices:
     put_message: JobCallable
     post_message: Callable[[Message], Any]
     clear_wallpaper_cache: Callable[[], None] | None = None
+    peach_sync: Callable[[], None] | None = None

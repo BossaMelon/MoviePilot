@@ -52,6 +52,19 @@ _TORRENT_FILES_RETRY_TIMES = 5
 _TORRENT_FILES_RETRY_INTERVAL = 1
 
 
+def _completion_confirmed(torrent_data: TorrentDictionary) -> bool:
+    """
+    只接受 qBittorrent 明确上传或已完成暂停状态，排除检查、元数据和错误兜底。
+    """
+    return bool(
+        str(torrent_data.get("state") or "").lower() in {"uploading", "stalledup", "pausedup", "stoppedup", "forcedup"}
+        and (torrent_data.get("progress") or 0) >= 1
+        and torrent_data.get("amount_left") == 0
+        and (torrent_data.get("total_size") or 0) > 0
+        and (torrent_data.get("completed") or 0) >= (torrent_data.get("total_size") or 0)
+    )
+
+
 class QbittorrentModule(_DownloaderModuleBase[Qbittorrent]):
     """
     qBittorrent 下载器模块，负责下载任务添加、文件选择和任务管理。
@@ -350,6 +363,7 @@ class QbittorrentModule(_DownloaderModuleBase[Qbittorrent]):
                 seeding_time_limit=torrent_data.get('seeding_time_limit'),
                 progress=(torrent_data.get('progress') or 0) * 100,
                 state=self.__normalize_torrent_state(torrent_data.get('state')),
+                completion_confirmed=_completion_confirmed(torrent_data),
                 dlspeed=size_tools.format_compact_size(dlspeed),
                 upspeed=size_tools.format_compact_size(torrent_data.get('upspeed')),
                 left_time=time_tools.format_duration(

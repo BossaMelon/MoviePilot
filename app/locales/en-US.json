@@ -593,7 +593,16 @@
     "未识别到媒体类型": "Media type could not be identified",
     "站点域名未配置": "Site domain is not configured",
     "站点配置不完整": "Site configuration is incomplete",
-    "站点不支持索引！": "Site does not support indexing!"
+    "站点不支持索引！": "Site does not support indexing!",
+    "番号格式或站点配置无效": "Invalid release code or site configuration",
+    "站点搜索暂不可用": "Site search is temporarily unavailable",
+    "候选失效或下载配置无效，请重新搜索": "Candidate expired or download configuration is invalid; search again",
+    "番号格式或馆藏响应无效": "Invalid release code or library response",
+    "Peach 馆藏暂不可用": "Peach library is temporarily unavailable",
+    "Peach 桥接尚未配置": "Peach integration is not configured",
+    "Peach 暂不可用，请检查专用连接配置": "Peach is unavailable; check the integration configuration",
+    "Peach 桥接配置不可用": "Peach integration configuration is unavailable",
+    "Peach 导入配置尚未就绪": "Peach import configuration is not ready"
   },
   "message_patterns": [
     {

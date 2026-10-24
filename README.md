@@ -1,5 +1,7 @@
 > 本 fork 已移除指定 PT 平台资格认证，站点能力使用 Python + JSON 源码实现。管理员与实际资源站点登录仍保留，见[源码站点模式](docs/local-site-mode.md)。
 
+> Peach 专区支持番号搜索、手动下载、完成后入库和馆藏展示，配置见 [Peach 桥接](docs/peach-bridge.md)。
+
 # MoviePilot
 
 简体中文 | [English](README_EN.md)

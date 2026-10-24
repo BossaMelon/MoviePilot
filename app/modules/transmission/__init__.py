@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 # 只描述 SDK 已公开的数值字段及旧版别名；不转换原始返回值。
 _IntTorrentAttribute = Literal[
-    "total_size", "totalSize", "rate_download", "rateDownload", "rate_upload", "rateUpload",
+    "error", "total_size", "totalSize", "rate_download", "rateDownload", "rate_upload", "rateUpload",
     "left_until_done", "leftUntilDone", "seed_idle_limit", "seedIdleLimit",
     "download_limit", "downloadLimit", "upload_limit", "uploadLimit",
 ]
@@ -91,6 +91,19 @@ def _normalize_transmission_progress(
     # 兼容旧适配器时仍可能收到已经归一化的百分比。
     percent_value = float(percent_done)
     return percent_value * 100 if 0 <= percent_value <= 1 else percent_value
+
+
+def _completion_confirmed(torrent_data: Torrent) -> bool:
+    """
+    使用 Transmission 4 RPC/SDK 明确完成状态与无错误、无剩余字节证据。
+    """
+    return bool(
+        str(torrent_data.status).lower() in {"seeding", "seed pending", "stopped"}
+        and _get_torrent_attr(torrent_data, "error") == 0
+        and _get_torrent_attr(torrent_data, "left_until_done", "leftUntilDone") == 0
+        and (_get_torrent_attr(torrent_data, "total_size", "totalSize") or 0) > 0
+        and _normalize_transmission_progress(torrent_data, _get_torrent_attr) >= 100
+    )
 
 
 class TransmissionModule(_DownloaderModuleBase[Transmission]):
@@ -369,6 +382,7 @@ class TransmissionModule(_DownloaderModuleBase[Transmission]):
                 progress=_normalize_transmission_progress(torrent_data, _get_torrent_attr),
                 size=__get_torrent_size(torrent_data),
                 state=self.__normalize_torrent_state(torrent_data.status),
+                completion_confirmed=_completion_confirmed(torrent_data),
                 dlspeed=size_tools.format_compact_size(dlspeed),
                 upspeed=size_tools.format_compact_size(upspeed),
                 tags=__get_torrent_labels(torrent_data),

@@ -86,6 +86,15 @@ def _wallpaper_job_specs(
     return (JobSpec("random_wallpager", "壁纸缓存", services.get_wallpapers, "image"),)
 
 
+def _peach_job_specs(services: SchedulerServices) -> tuple[JobSpec, ...]:
+    """
+    只在显式装配桥接能力时登记完成核实任务，默认禁用且不访问网络。
+    """
+    if services.peach_sync is None:
+        return ()
+    return (JobSpec("peach_sync", "Peach 下载入库", services.peach_sync, "peach"),)
+
+
 # APScheduler 未提供类型注解，基类在 mypy 中是 Any
 # 自主 Agent 任务只需独立的有限触发容量；协程执行仍由原主循环和句柄 owner 托管。
 _AGENT_SCHEDULER_WORKERS = 2
@@ -195,6 +204,16 @@ class SchedulerCatalogOwner(_SchedulerOwnerBase):
             replace_existing=True,
         )
 
+    def _register_peach_sync_job(self, services: SchedulerServices) -> None:
+        """
+        为已配置的 Peach 能力登记一分钟同步，沿用共享执行器及生命周期。
+        """
+        if services.peach_sync is not None:
+            self._scheduler.add_job(
+                self.start, "interval", id="peach_sync", name="Peach 下载入库",
+                seconds=60, kwargs={"job_id": "peach_sync"}, replace_existing=True,
+            )
+
     def _poll_subscription_search_queue(self) -> None:
         """
         仅在消费者空闲时唤醒托管协程，轮询不等待搜索也不重复报告重入。
@@ -247,6 +266,7 @@ class SchedulerCatalogOwner(_SchedulerOwnerBase):
                 JobSpec("data_cleanup", "数据表清理", services.cleanup_data, "database"),
                 JobSpec("scheduler_job", "公共定时服务", services.run_modules, "module"),
                 *_wallpaper_job_specs(services, config.wallpaper),
+                *_peach_job_specs(services),
                 JobSpec("sitedata_refresh", "站点数据刷新", services.refresh_site_data, "site"),
                 JobSpec("recommend_refresh", "推荐缓存", services.refresh_recommend, "recommend"),
                 JobSpec(
@@ -299,6 +319,7 @@ class SchedulerCatalogOwner(_SchedulerOwnerBase):
             kwargs={"job_id": "outbox_dispatch"},
             replace_existing=True,
         )
+        self._register_peach_sync_job(services)
         # CookieCloud定时同步
         if (
             config.cookiecloud_configured

@@ -606,6 +606,12 @@ class ConfigModel(BaseModel):
     MEDIA_RECOGNIZE_SHARE: bool = Field(default=True, description='共享使用媒体识别数据')
 
     # 服务地址配置
+    # Peach 桥接服务地址，仅由管理员配置，不随候选返回浏览器。
+    PEACH_URL: Optional[str] = Field(default=None, description="Peach 服务地址")
+    # Peach 专用集成密钥，不使用站点 Cookie 或管理员登录令牌。
+    PEACH_TOKEN: Optional[str] = Field(default=None, description="Peach 专用集成令牌")
+    # Peach 独占的本地下载根目录，不允许与普通媒体目录重叠。
+    PEACH_DOWNLOAD_ROOT: Optional[str] = Field(default=None, description="Peach 专用下载根目录，禁止由影视整理监控")
     MP_SERVER_HOST: str = Field(
         default="https://movie-pilot.org",
         description='服务器地址，对应 https://github.com/jxxghp/MoviePilot-Server 项目',

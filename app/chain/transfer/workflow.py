@@ -34,6 +34,7 @@ from app.domain.meta.metabase import MetaBase
 from app.domain.music import music_package_error
 from app.runtime.log import logger
 from app.runtime.progress import ProgressHelper
+from app.runtime.settings import get_runtime_setting
 from app.runtime.stop import runtime_stop_state
 from app.schemas.exception import OperationInterrupted, StorageQueryError
 from app.schemas.file import FileItem, FileURI
@@ -53,6 +54,26 @@ from .request import (
     _TransferSubmissionCollector,
     build_transfer_preview_item,
 )
+
+
+def _split_music_album(
+    media: Optional[Union[MediaInfo, MusicInfo, MusicAlbumInfo]],
+) -> tuple[Optional[MusicAlbumInfo], Optional[Union[MediaInfo, MusicInfo]]]:
+    """
+    归一音乐专辑输入并保留原始专辑对象，避免整理准入累积身份分支。
+    """
+    if isinstance(media, MusicAlbumInfo):
+        return media, media.to_music_info()
+    return None, media
+
+
+def _peach_owns_file(fileitem: FileItem) -> bool:
+    """
+    查询独占根目录，阻止普通整理接管 Peach 文件。
+    """
+    root = get_runtime_setting("PEACH_DOWNLOAD_ROOT", None)
+    return bool(root and fileitem.storage == "local" and fileitem.path
+                and Path(fileitem.path).resolve().is_relative_to(Path(root).resolve()))
 
 
 def _normalize_transfer_identity(
@@ -550,12 +571,9 @@ class TransferWorkflowOwner(_TransferOwnerBase):
         :param skip_success: 在预览、历史清理及任务准入前跳过成功记录
         返回：成功标识，错误信息
         """
-        selected_music_album: Optional[MusicAlbumInfo]
-        if isinstance(mediainfo, MusicAlbumInfo):
-            selected_music_album = mediainfo
-            mediainfo = mediainfo.to_music_info()
-        else:
-            selected_music_album = None
+        if _peach_owns_file(fileitem):
+            return False, "Peach 专用下载目录由 Peach 入库，不执行影视整理"
+        selected_music_album, mediainfo = _split_music_album(mediainfo)
         mediainfo, media_source, media_id, identity_error = _normalize_transfer_identity(
             mediainfo=mediainfo,
             mtype=mtype,

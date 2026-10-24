@@ -20,9 +20,11 @@ from app.chain.subscribe.facade import SubscribeChain
 from app.chain.transfer.facade import TransferChain
 from app.chain.workflow import WorkflowChain
 from app.runtime.execution import run_in_threadpool_to_completion
+from app.runtime.settings import get_runtime_setting
 from app.scheduler.chain import SchedulerChain
 from app.scheduler.facade import Scheduler
 from app.scheduler.services import SchedulerServices
+from app.startup.composition.peach import sync_peach_downloads
 
 
 def configure_scheduler_runtime() -> None:
@@ -84,6 +86,9 @@ def configure_scheduler_services() -> None:
             run_modules=scheduler_chain.scheduler_job,
             get_wallpapers=WallpaperHelper().get_wallpapers,
             clear_wallpaper_cache=WallpaperHelper().clear_cache,
+            peach_sync=sync_peach_downloads if all(
+                get_runtime_setting(key) for key in ("PEACH_URL", "PEACH_TOKEN", "PEACH_DOWNLOAD_ROOT")
+            ) else None,
             refresh_site_data=site_chain.refresh_userdatas,
             refresh_recommend=recommend_chain.refresh_recommend,
             cache_subscribe_calendar=subscribe_chain.cache_calendar,

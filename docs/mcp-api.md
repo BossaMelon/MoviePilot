@@ -396,3 +396,9 @@ REST 调用示例：
 - [下载器操作参考](../skills/downloader-operation/SKILL.md)、[媒体服务器操作参考](../skills/mediaserver-operation/SKILL.md)、[数据库操作参考](../skills/database-operation/SKILL.md)：原生服务与 SQL 操作合同。
 
 本文维护连接方式、发现流程、调用结构和结果处理。字段清单、操作全集、提供方差异由运行时 Schema 及对应参考维护；新增业务能力时不应继续向本文追加 REST 路由表、前端展示契约或版本变更记录。
+
+### Peach 手动闭环
+
+`/api/v1/peach` 是已登录用户的专用 REST 交互接口。本阶段不加入 MCP 的
+`API_OPERATION_SPECS` 或技能允许列表；搜索、选择资源及下载须由有管理权限的用户明确操作。
+Agent 网关对未知 operation 仍失败关闭。接口说明与环境配置见 [Peach 桥接](peach-bridge.md)。

@@ -30,6 +30,7 @@ class DownloaderTorrent(BaseModel):
     size: Optional[float] = Field(default=0.0, description="文件大小，单位为字节")
     progress: Optional[float] = Field(default=0.0, description="当前完成百分比")
     state: Optional[str] = Field(default="downloading", description="当前业务状态")
+    completion_confirmed: bool = Field(default=False, description="原始下载器状态、剩余字节与进度均明确确认下载完成")
     upspeed: Optional[str] = Field(default=None, description="当前上传速度的格式化展示文本")
     dlspeed: Optional[str] = Field(default=None, description="当前下载速度的格式化展示文本")
     tags: Optional[str] = Field(default=None, description="下载器返回的任务标签文本")
