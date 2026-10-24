@@ -11,7 +11,6 @@ import pytest
 from app.application.configuration import SchedulerRuntimeConfig
 from app.scheduler import catalog as scheduler_catalog
 from app.scheduler import lifecycle as scheduler_lifecycle
-from app.scheduler import reconcile as scheduler_reconcile
 from app.scheduler.facade import Scheduler
 from app.scheduler.registry import ExecutionRegistry
 from app.startup.initializers import scheduler as scheduler_initializer
@@ -182,94 +181,3 @@ def test_clear_cache_is_manual_only(monkeypatch):
     heartbeat = next(job for job in background_scheduler.jobs if job["id"] == "agent_heartbeat")
     assert heartbeat["executor"] == "agent"
     assert scheduler._jobs["agent_heartbeat"]["execution_group"] == "agent"
-
-
-def test_user_auth_refreshes_plugin_routes_after_runtime_reinitialization(monkeypatch):
-    """
-    自动认证重建插件实例后必须同步刷新动态路由投影。
-    """
-    scheduler = object.__new__(Scheduler)
-    scheduler._auth_count = 1
-    scheduler._auth_message = False
-    scheduler._auth_plugin_routes_pending = False
-    plugin_manager = Mock()
-    plugin_jobs = Mock()
-    refresh_routes = Mock()
-    message_chain = Mock()
-    monkeypatch.setattr(
-        scheduler_reconcile,
-        "get_scheduler_runtime_config",
-        lambda: Mock(site_link="https://example.invalid"),
-    )
-    monkeypatch.setattr(
-        scheduler_reconcile,
-        "SitesHelper",
-        lambda: Mock(auth_level=0, check_user=Mock(return_value=(True, "demo"))),
-    )
-    monkeypatch.setattr(
-        scheduler_reconcile,
-        "get_configured_system_config",
-        lambda: Mock(get=Mock(return_value=None)),
-    )
-    scheduler._services = Mock(post_message=message_chain.post_message)
-    monkeypatch.setattr(
-        scheduler_reconcile,
-        "get_plugin_manager",
-        lambda: plugin_manager,
-    )
-    monkeypatch.setattr(scheduler, "init_plugin_jobs", plugin_jobs)
-    monkeypatch.setattr(scheduler_reconcile, "register_plugin_api", refresh_routes)
-
-    scheduler.user_auth()
-
-    plugin_manager.init_config.assert_called_once_with()
-    plugin_jobs.assert_called_once_with()
-    refresh_routes.assert_called_once_with()
-    assert scheduler._auth_plugin_routes_pending is False
-
-
-def test_user_auth_retries_pending_plugin_route_projection(monkeypatch):
-    """
-    认证已成功但路由投影失败时，后续认证任务只重试未完成的投影。
-    """
-    scheduler = object.__new__(Scheduler)
-    scheduler._auth_count = 1
-    scheduler._auth_message = False
-    scheduler._auth_plugin_routes_pending = False
-    plugin_manager = Mock()
-    plugin_jobs = Mock()
-    refresh_routes = Mock(side_effect=[RuntimeError("loop unavailable"), None])
-    message_chain = Mock()
-    sites = Mock(auth_level=0, check_user=Mock(return_value=(True, "demo")))
-    monkeypatch.setattr(
-        scheduler_reconcile,
-        "get_scheduler_runtime_config",
-        lambda: Mock(site_link="https://example.invalid"),
-    )
-    monkeypatch.setattr(scheduler_reconcile, "SitesHelper", lambda: sites)
-    monkeypatch.setattr(
-        scheduler_reconcile,
-        "get_configured_system_config",
-        lambda: Mock(get=Mock(return_value=None)),
-    )
-    scheduler._services = Mock(post_message=message_chain.post_message)
-    monkeypatch.setattr(
-        scheduler_reconcile,
-        "get_plugin_manager",
-        lambda: plugin_manager,
-    )
-    monkeypatch.setattr(scheduler, "init_plugin_jobs", plugin_jobs)
-    monkeypatch.setattr(scheduler_reconcile, "register_plugin_api", refresh_routes)
-
-    with pytest.raises(RuntimeError, match="loop unavailable"):
-        scheduler.user_auth()
-
-    assert scheduler._auth_plugin_routes_pending is True
-    sites.auth_level = 2
-    scheduler.user_auth()
-
-    assert scheduler._auth_plugin_routes_pending is False
-    assert refresh_routes.call_count == 2
-    plugin_manager.init_config.assert_called_once_with()
-    plugin_jobs.assert_called_once_with()
-    sites.check_user.assert_called_once_with()

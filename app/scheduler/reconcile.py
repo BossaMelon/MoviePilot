@@ -11,25 +11,18 @@ from apscheduler.triggers.cron import CronTrigger
 
 from app.application.agenttask import AgentTaskRepository
 from app.application.configuration import (
-    get_configured_system_config,
     get_scheduler_runtime_config,
 )
-from app.application.plugin.routes import register_plugin_api
 from app.application.plugin.runtime import get_plugin_manager
 from app.application.scheduling import (  # noqa: E402
     AGENT_TASK_JOB_PREFIX,
     JobRecoveryPolicy,
     JobSpec,
 )
-from app.application.site.auth import normalize_site_auth_config
-from app.application.site.sites import SitesHelper  # pylint: disable=import-error,no-name-in-module
 from app.application.workflow import WorkflowSnapshot
 from app.runtime.log import logger, wrap_for_plugin_instance
 from app.runtime.scheduling import TimerUtils
-from app.runtime.settings import get_runtime_setting
 from app.scheduler.contract import _SchedulerOwnerBase
-from app.schemas.message import Message
-from app.schemas.types import MessageType, SystemConfigKey
 
 
 class SchedulerReconcileOwner(_SchedulerOwnerBase):
@@ -472,62 +465,3 @@ class SchedulerReconcileOwner(_SchedulerOwnerBase):
                         message=str(e),
                         role="system",
                     )
-
-    def user_auth(self) -> None:
-        """
-        用户认证检查
-        """
-        config = get_scheduler_runtime_config()
-        if SitesHelper().auth_level >= 2:
-            if self._auth_plugin_routes_pending:
-                register_plugin_api()
-                self._auth_plugin_routes_pending = False
-            return
-        # 最大重试次数
-        __max_try__ = 30
-        if self._auth_count > __max_try__:
-            if not self._auth_message:
-                self._scheduler_services().put_message(
-                    title="用户认证失败",
-                    message="用户认证失败次数过多，将不再尝试认证！",
-                    role="system",
-                )
-                self._auth_message = True
-            return
-        logger.info("用户未认证，正在尝试认证...")
-        auth_conf = get_configured_system_config().get(SystemConfigKey.UserSiteAuthParams)
-        sites_helper = SitesHelper()
-        if get_runtime_setting("AUTH_SITE"):
-            status, msg = sites_helper.check_user()
-        else:
-            normalized_auth_conf = normalize_site_auth_config(
-                auth_conf,
-                sites_helper.get_authsites(),
-            )
-            if normalized_auth_conf:
-                status, msg = sites_helper.check_user(**normalized_auth_conf)
-            else:
-                status, msg = sites_helper.check_user()
-        if status:
-            self._auth_count = 0
-            logger.info(f"{msg} 用户认证成功")
-            self._scheduler_services().post_message(
-                Message(
-                    mtype=MessageType.Manual,
-                    title="MoviePilot用户认证成功",
-                    text=f"使用站点：{msg}，如有插件使用异常，请重启MoviePilot。",
-                    link=config.site_link,
-                )
-            )
-            # 认证通过后重新初始化插件
-            get_plugin_manager().init_config()
-            self.init_plugin_jobs()
-            self._auth_plugin_routes_pending = True
-            register_plugin_api()
-            self._auth_plugin_routes_pending = False
-
-        else:
-            self._auth_count += 1
-            logger.error(f"用户认证失败，{msg}，共失败 {self._auth_count} 次")
-            if self._auth_count >= __max_try__:
-                logger.error("用户认证失败次数过多，将不再尝试认证！")

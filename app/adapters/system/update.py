@@ -63,12 +63,12 @@ class SystemUpdateManager(metaclass=SingletonClass):
     持久化两类升级状态，并保证同一时刻只有一个后台下载任务。
     """
 
-    _BACKEND_RELEASES_API = "https://api.github.com/repos/jxxghp/MoviePilot/releases"
+    _BACKEND_RELEASES_API = "https://api.github.com/repos/BossaMelon/MoviePilot/releases"
     _FRONTEND_RELEASE_API = (
-        "https://api.github.com/repos/jxxghp/MoviePilot-Frontend/releases/tags/{tag}"
+        "https://api.github.com/repos/BossaMelon/MoviePilot-Frontend/releases/tags/{tag}"
     )
     _BACKEND_ARCHIVE_URL = (
-        "https://github.com/jxxghp/MoviePilot/archive/refs/tags/{tag}.zip"
+        "https://github.com/BossaMelon/MoviePilot/archive/refs/tags/{tag}.zip"
     )
     _VERSION_PATTERN = re.compile(r"^v3\.\d+\.\d+(?:[-.](?:alpha|beta|rc)\d*)?$", re.I)
     # 镜像构建时写入的系统基线（ISO 日期），记录镜像系统软件包刷新到的安全基线。
@@ -1074,11 +1074,10 @@ class SystemUpdateManager(metaclass=SingletonClass):
         if not resource_dir.is_dir():
             return
         for path in resource_dir.iterdir():
-            if path.is_file() and path.name.startswith("sites.") and path.suffix in {
-                ".so",
-                ".pyd",
-                ".dylib",
-            }:
+            if path.is_file() and (
+                (path.name.startswith("sites.") and path.suffix in {".so", ".pyd", ".dylib"})
+                or (path.name.startswith("user.sites.") and path.suffix == ".bin")
+            ):
                 path.unlink()
 
     def _resource_source_dir(self, app_dir: Path) -> Path:
@@ -1094,32 +1093,6 @@ class SystemUpdateManager(metaclass=SingletonClass):
             if not resource_dir.is_dir() and legacy_dir.is_dir():
                 resource_dir = legacy_dir
         return resource_dir
-
-    @staticmethod
-    def _is_site_runtime_resource(path: Path) -> bool:
-        """
-        判断文件是否属于需要跨 Docker 应用升级继承的站点运行时资源。
-        """
-        return path.is_file() and (
-            (path.name.startswith("user.sites.") and path.suffix == ".bin")
-            or (
-                path.name.startswith("sites.")
-                and path.suffix in {".so", ".pyd", ".dylib"}
-            )
-        )
-
-    def _copy_site_runtime_resources(
-        self, source_dir: Path, destination_dir: Path
-    ) -> None:
-        """
-        只把旧版本的站点索引和原生资源叠加到新版源码目录。
-        """
-        if not source_dir.is_dir():
-            return
-        destination_dir.mkdir(parents=True, exist_ok=True)
-        for path in source_dir.iterdir():
-            if self._is_site_runtime_resource(path):
-                shutil.copy2(path, destination_dir / path.name)
 
     def _copy_prepared_resources(
         self, prepared: dict[str, Any], resource_dir: Path
@@ -1144,7 +1117,7 @@ class SystemUpdateManager(metaclass=SingletonClass):
         """
         解压并组装待切换的 Docker 后端、前端和插件资源载荷。
 
-        新版本归档是 Python 源码的唯一来源，旧版本目录只迁移插件和站点运行时内容，
+        新版本归档是 Python 源码的唯一来源，旧版本目录只迁移插件内容，
         不覆盖新版的插件包根兼容入口或新增应用模块。
         """
         backend_extract = temporary_root / "backend"
@@ -1176,8 +1149,9 @@ class SystemUpdateManager(metaclass=SingletonClass):
             raise RuntimeError("插件运行目录缺少 app.plugins 兼容入口")
 
         stage_resources = stage_app / "app" / "application" / "site"
-        current_resources = self._resource_source_dir(current_app)
-        self._copy_site_runtime_resources(current_resources, stage_resources)
+        if not (stage_resources / "sites.py").is_file() or not (stage_resources / "sites.json").is_file():
+            raise RuntimeError("应用更新包缺少站点源码或公开索引")
+        self._clear_staged_native_resources(stage_resources)
         if include_resources:
             self._copy_prepared_resources(prepared, stage_resources)
         return stage_app, stage_public
@@ -1661,7 +1635,7 @@ class SystemUpdateManager(metaclass=SingletonClass):
                 path.resolve().relative_to(root)
             except ValueError as error:
                 raise RuntimeError("站点资源文件路径不安全") from error
-            if not path.is_file() or self._sha256(path) != item.get("sha256"):
+            if path.name != item.get("name") or not path.is_file() or self._sha256(path) != item.get("sha256"):
                 raise RuntimeError(f"站点资源文件校验失败：{item.get('name')}")
 
     def _request(self) -> RequestUtils:

@@ -219,7 +219,6 @@ class ConfigModel(BaseModel):
         Optional[str],
         SettingPolicy(converter=_normalize_api_token, sensitive=True),
     ] = Field(default=None, description='API密钥，需要更换')
-    AUTH_SITE: str = Field(default="", description='用户认证站点')
 
     # 数据库配置
     API_WORKERS: int = Field(
@@ -623,6 +622,7 @@ class ConfigModel(BaseModel):
     CUSTOMIZE_WALLPAPER_API_URL: Optional[str] = Field(default=None, description='自定义壁纸api地址')
 
     # 插件配置
+    # 插件市场地址列表，使用逗号分隔的 GitHub 仓库地址。
     PLUGIN_MARKET: str = (
         "https://github.com/jxxghp/MoviePilot-Plugins,"
         "https://github.com/thsrite/MoviePilot-Plugins,"

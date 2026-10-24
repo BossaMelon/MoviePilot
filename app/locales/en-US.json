@@ -592,7 +592,8 @@
     "源文件路径为空": "Source file path is empty",
     "未识别到媒体类型": "Media type could not be identified",
     "站点域名未配置": "Site domain is not configured",
-    "站点配置不完整": "Site configuration is incomplete"
+    "站点配置不完整": "Site configuration is incomplete",
+    "站点不支持索引！": "Site does not support indexing!"
   },
   "message_patterns": [
     {

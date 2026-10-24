@@ -1598,7 +1598,7 @@
               "type": "null"
             }
           ],
-          "description": "发布时间",
+          "description": "距离发布经过的分钟数；单值为最小等待时间，区间表示允许的时间范围",
           "title": "Publish Time"
         },
         "rule_id": {
@@ -1627,7 +1627,7 @@
               "type": "null"
             }
           ],
-          "description": "大小范围（MB）",
+          "description": "单集平均文件大小范围，单位为 MiB；a-b、>a、<a 均包含边界，空值不限制",
           "title": "Size Range"
         }
       },
@@ -1698,7 +1698,7 @@
               "type": "null"
             }
           ],
-          "description": "发布时间",
+          "description": "距离发布经过的分钟数；单值为最小等待时间，区间表示允许的时间范围",
           "title": "Publish Time"
         },
         "seeders": {
@@ -1722,7 +1722,7 @@
               "type": "null"
             }
           ],
-          "description": "大小范围（MB）",
+          "description": "单集平均文件大小范围，单位为 MiB；a-b、>a、<a 均包含边界，空值不限制",
           "title": "Size Range"
         }
       },
@@ -2192,7 +2192,7 @@
               "type": "null"
             }
           ],
-          "description": "文件修改时间的 Unix 时间戳",
+          "description": "文件修改时间的 Unix 时间戳，单位为秒，未提供时为 None",
           "title": "Modify Time"
         },
         "name": {
@@ -2253,7 +2253,7 @@
               "type": "null"
             }
           ],
-          "description": "文件大小",
+          "description": "文件大小，单位为字节；目录或来源未提供时可为 None",
           "title": "Size"
         },
         "storage": {
@@ -2532,8 +2532,15 @@
           "title": "Episode Part"
         },
         "fileitem": {
-          "$ref": "#/$defs/FileItem-Input",
-          "description": "storage.list 返回的一个完整源存储项目。"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FileItem-Input"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "文件项"
         },
         "fileitems": {
           "anyOf": [
@@ -2647,7 +2654,7 @@
             }
           ],
           "default": 0,
-          "description": "最小文件大小",
+          "description": "最低文件大小阈值，单位为 MiB；0 不限制，启用时仅保留严格大于阈值的文件",
           "title": "Min Filesize"
         },
         "music_cue_enable": {
@@ -3623,47 +3630,6 @@
         }
       },
       "title": "Site",
-      "type": "object"
-    },
-    "SiteAuth": {
-      "description": "受支持的站点账号认证提供方及精确参数值。",
-      "properties": {
-        "params": {
-          "anyOf": [
-            {
-              "additionalProperties": {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ]
-              },
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "请求参数",
-          "title": "Params"
-        },
-        "site": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "站点ID",
-          "title": "Site"
-        }
-      },
-      "title": "SiteAuth",
       "type": "object"
     },
     "SiteCookieSet": {
@@ -5148,7 +5114,7 @@
               "type": "null"
             }
           ],
-          "description": "下载因子",
+          "description": "下载统计倍率，例如 0 表示免费下载、0.5 表示按一半下载量计入统计",
           "title": "Downloadvolumefactor"
         },
         "enclosure": {
@@ -5410,7 +5376,7 @@
             }
           ],
           "default": 0.0,
-          "description": "种子大小",
+          "description": "种子包含的文件总大小，单位为字节",
           "title": "Size"
         },
         "title": {
@@ -5434,7 +5400,7 @@
               "type": "null"
             }
           ],
-          "description": "上传因子",
+          "description": "上传统计倍率，例如 2 表示按实际上传量的两倍计入站点统计",
           "title": "Uploadvolumefactor"
         },
         "volume_factor": {
@@ -9293,9 +9259,16 @@
               "title": "Page"
             },
             "season": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "description": "媒体、搜索、订阅或整理操作使用的季号。",
-              "title": "Season",
-              "type": "integer"
+              "title": "Season"
             },
             "title": {
               "anyOf": [
@@ -9310,9 +9283,16 @@
               "title": "Title"
             },
             "year": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "description": "用于区分同名媒体的发行或首映年份。",
-              "title": "Year",
-              "type": "string"
+              "title": "Year"
             }
           },
           "type": "object"
@@ -11941,43 +11921,6 @@
         "body"
       ],
       "title": "site.add",
-      "type": "object"
-    },
-    {
-      "additionalProperties": false,
-      "description": "列出站点账号认证提供方及所需输入定义。请求方法：GET；路径：/api/v1/site/auth。操作效果：safe_read；身份范围：bound_user。所需角色：user。",
-      "properties": {
-        "operation_id": {
-          "const": "site.auth.options",
-          "description": "白名单中的精确操作标识，用于选择对应 oneOf 分支。",
-          "type": "string"
-        }
-      },
-      "required": [
-        "operation_id"
-      ],
-      "title": "site.auth.options",
-      "type": "object"
-    },
-    {
-      "additionalProperties": false,
-      "description": "认证受支持站点的账号，并保存取得的站点授权状态。请求方法：POST；路径：/api/v1/site/auth。操作效果：external_side_effect；身份范围：admin。所需角色：system_admin。",
-      "properties": {
-        "body": {
-          "$ref": "#/$defs/SiteAuth",
-          "description": "site.authenticate 的请求内容。认证受支持站点的账号，并保存取得的站点授权状态。严格使用下列类型和字段。"
-        },
-        "operation_id": {
-          "const": "site.authenticate",
-          "description": "白名单中的精确操作标识，用于选择对应 oneOf 分支。",
-          "type": "string"
-        }
-      },
-      "required": [
-        "operation_id",
-        "body"
-      ],
-      "title": "site.authenticate",
       "type": "object"
     },
     {
@@ -16762,8 +16705,6 @@
         "search.title",
         "search.torrents",
         "site.add",
-        "site.auth.options",
-        "site.authenticate",
         "site.category",
         "site.cookie.set",
         "site.cookie.update",

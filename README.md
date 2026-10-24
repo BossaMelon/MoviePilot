@@ -1,3 +1,5 @@
+> 本 fork 已移除指定 PT 平台资格认证，站点能力使用 Python + JSON 源码实现。管理员与实际资源站点登录仍保留，见[源码站点模式](docs/local-site-mode.md)。
+
 # MoviePilot
 
 简体中文 | [English](README_EN.md)

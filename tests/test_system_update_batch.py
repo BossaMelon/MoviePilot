@@ -69,7 +69,7 @@ def _ready(manager, monkeypatch):
     """
     创建两类可校验制品，供真实合并安装意图使用。
     """
-    names = ["user.sites.v3.bin", "sites.cpython-test.so"]
+    names = ["sites.json"]
     monkeypatch.setattr(update_module.ResourceHelper, "_get_needed_files", classmethod(lambda cls: names))
     manager._root.mkdir(parents=True, exist_ok=True)
     for path in (manager._backend_archive, manager._frontend_archive):
@@ -281,13 +281,15 @@ def test_combined_docker_install_applies_all_payloads_in_one_transaction(monkeyp
     plugin.mkdir(parents=True)
     public.mkdir()
     (plugin / "__init__.py").write_text("custom plugin")
-    (resource / "user.sites.v3.bin").write_bytes(b"old-resource")
+    (resource / "sites.json").write_bytes(b"old-resource")
     for name in ("pyproject.toml", "uv.lock"):
         (app / name).write_text("same")
     with zipfile.ZipFile(manager._backend_archive, "w") as archive:
         archive.writestr("repo/version.py", "APP_VERSION = 'v3.1.7'\nFRONTEND_VERSION = 'v3.1.6'\n")
         archive.writestr("repo/app/plugins/__init__.py", "new package")
         archive.writestr("repo/app/application/site/auth.py", "new source")
+        archive.writestr("repo/app/application/site/sites.py", "# source")
+        archive.writestr("repo/app/application/site/sites.json", '{"version":"2","sites":{}}')
         for name in ("pyproject.toml", "uv.lock"):
             archive.writestr(f"repo/{name}", "same")
     with zipfile.ZipFile(manager._frontend_archive, "w") as archive:
@@ -302,8 +304,7 @@ def test_combined_docker_install_applies_all_payloads_in_one_transaction(monkeyp
     assert manager.apply_prepared_update()[0] is True
     assert (app / "version.py").read_text().startswith("APP_VERSION = 'v3.1.7'")
     assert (public / "index.html").read_text() == "new frontend"
-    assert (resource / "user.sites.v3.bin").read_bytes() == b"new-resource"
-    assert (resource / "sites.cpython-test.so").read_bytes() == b"new-resource"
+    assert (resource / "sites.json").read_bytes() == b"new-resource"
     assert (plugin / "__init__.py").read_text() == "custom plugin"
     assert not manager._install_file.exists()
     assert not (manager._root / "prepared.json").exists()

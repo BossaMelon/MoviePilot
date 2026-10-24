@@ -13,7 +13,7 @@ from app.application.site.observation import report_site_search_outcome, report_
 from app.application.site.query import get_configured_site_query_service
 
 # 站点目录由外部资源在运行时提供，静态检查环境不包含其实体模块。
-from app.application.site.sites import SitesHelper  # pylint: disable=import-error,no-name-in-module
+from app.application.site.sites import SitesHelper
 from app.domain import site as site_rules
 from app.domain import torrent as torrent_rules
 from app.domain.context import Context, SubtitleInfo, TorrentInfo
@@ -221,13 +221,13 @@ class IndexerModule(_ModuleBase):
 
     def test(self) -> Tuple[bool, str]:
         """
-        检查是否存在已配置并通过用户认证的索引站点，不发起网络探测。
+        检查是否存在已配置的索引站点，不发起网络探测。
 
         :return: 是否可用及失败原因；可用时原因为空字符串
         """
         sites = SitesHelper().get_indexers()
         if not sites:
-            return False, "未配置站点或未通过用户认证"
+            return False, "未配置受支持的站点"
         return True, ""
 
     def init_setting(self) -> Optional[Tuple[str, Union[str, bool]]]:

@@ -57,7 +57,7 @@ Purpose: 执行手动文件转移与整理流程。
 Identity scope: `admin`; required role: `system_admin`.
 - `path_params`: none
 - `query`: `background` (boolean|null; default `False`): 是否异步执行整理，并在完成前返回。
-- `body`: `episode_detail` (string|null): 指定集数; `episode_format` (string|null): 自定义格式; `episode_group` (string|null): 剧集组; `episode_offset` (string|null): 集数偏移; `episode_part` (string|null): 指定PART; `fileitem` (FileItem-Input): storage.list 返回的一个完整源存储项目。; `fileitems` (array<FileItem-Input>|null): 文件项列表（前端多选时传入）; `from_history` (boolean|null; default `False`): 复用历史识别信息; `library_category_folder` (boolean|null): 媒体库类别子目录; `library_type_folder` (boolean|null): 媒体库类型子目录; `logid` (integer|null): 日志ID; `logids` (array<integer>|null): 日志ID列表（前端多选历史记录时传入）; `media_id` (string|null): 数据源原生ID; `media_source` (MediaSource|null): 媒体数据源; `min_filesize` (integer|null; default `0`): 最小文件大小; `music_cue_enable` (boolean|null): 本次手动整理是否识别 CUE；空值继承系统设置; `music_release_regions` (array<string>|null): 本次手动整理的 MusicBrainz 发行地区优先级；空值继承系统设置; `music_release_scripts` (array<string>|null): 本次手动整理的 MusicBrainz 文字字形优先级；空值继承系统设置; `music_type` (string(recording,album)|null): 音乐实体类型; `musicbrainz_release_id` (string|null): 显式选择具体发行版；media_id 仍为 Release Group，不能互换; `preview` (boolean|null; default `False`): 仅预览，不执行整理; `reorganize` (boolean|null; default `False`): 重新整理，清理命中的成功历史及其旧目标; `scrape` (boolean|null; default `False`): 刮削; `season` (integer|null): 季号; `skip_success` (boolean; default `False`): 跳过成功历史，优先于重新整理；预览与执行使用相同过滤范围; `target_path` (string|null): 目标路径; `target_storage` (string|null): 目标存储; `transfer_type` (string|null): 整理方式; `type_name` (string|null): 类型
+- `body`: `episode_detail` (string|null): 指定集数; `episode_format` (string|null): 自定义格式; `episode_group` (string|null): 剧集组; `episode_offset` (string|null): 集数偏移; `episode_part` (string|null): 指定PART; `fileitem` (FileItem-Input|null): 文件项; `fileitems` (array<FileItem-Input>|null): 文件项列表（前端多选时传入）; `from_history` (boolean|null; default `False`): 复用历史识别信息; `library_category_folder` (boolean|null): 媒体库类别子目录; `library_type_folder` (boolean|null): 媒体库类型子目录; `logid` (integer|null): 日志ID; `logids` (array<integer>|null): 日志ID列表（前端多选历史记录时传入）; `media_id` (string|null): 数据源原生ID; `media_source` (MediaSource|null): 媒体数据源; `min_filesize` (integer|null; default `0`): 最低文件大小阈值，单位为 MiB；0 不限制，启用时仅保留严格大于阈值的文件; `music_cue_enable` (boolean|null): 本次手动整理是否识别 CUE；空值继承系统设置; `music_release_regions` (array<string>|null): 本次手动整理的 MusicBrainz 发行地区优先级；空值继承系统设置; `music_release_scripts` (array<string>|null): 本次手动整理的 MusicBrainz 文字字形优先级；空值继承系统设置; `music_type` (string(recording,album)|null): 音乐实体类型; `musicbrainz_release_id` (string|null): 显式选择具体发行版；media_id 仍为 Release Group，不能互换; `preview` (boolean|null; default `False`): 仅预览，不执行整理; `reorganize` (boolean|null; default `False`): 重新整理，清理命中的成功历史及其旧目标; `scrape` (boolean|null; default `False`): 刮削; `season` (integer|null): 季号; `skip_success` (boolean; default `False`): 跳过成功历史，优先于重新整理；预览与执行使用相同过滤范围; `target_path` (string|null): 目标路径; `target_storage` (string|null): 目标存储; `transfer_type` (string|null): 整理方式; `type_name` (string|null): 类型
 
 ### `transfer.history`
 `GET /api/v1/history/transfer`; policy effect: `safe_read`.
@@ -114,7 +114,7 @@ Purpose: 检查给定存储项目是否已有成功整理历史。
 Identity scope: `admin`; required role: `system_admin`.
 - `path_params`: none
 - `query`: none
-- `body`: `episode_detail` (string|null): 指定集数; `episode_format` (string|null): 自定义格式; `episode_group` (string|null): 剧集组; `episode_offset` (string|null): 集数偏移; `episode_part` (string|null): 指定PART; `fileitem` (FileItem-Input): storage.list 返回的一个完整源存储项目。; `fileitems` (array<FileItem-Input>|null): 文件项列表（前端多选时传入）; `from_history` (boolean|null; default `False`): 复用历史识别信息; `library_category_folder` (boolean|null): 媒体库类别子目录; `library_type_folder` (boolean|null): 媒体库类型子目录; `logid` (integer|null): 日志ID; `logids` (array<integer>|null): 日志ID列表（前端多选历史记录时传入）; `media_id` (string|null): 数据源原生ID; `media_source` (MediaSource|null): 媒体数据源; `min_filesize` (integer|null; default `0`): 最小文件大小; `music_cue_enable` (boolean|null): 本次手动整理是否识别 CUE；空值继承系统设置; `music_release_regions` (array<string>|null): 本次手动整理的 MusicBrainz 发行地区优先级；空值继承系统设置; `music_release_scripts` (array<string>|null): 本次手动整理的 MusicBrainz 文字字形优先级；空值继承系统设置; `music_type` (string(recording,album)|null): 音乐实体类型; `musicbrainz_release_id` (string|null): 显式选择具体发行版；media_id 仍为 Release Group，不能互换; `preview` (boolean|null; default `False`): 仅预览，不执行整理; `reorganize` (boolean|null; default `False`): 重新整理，清理命中的成功历史及其旧目标; `scrape` (boolean|null; default `False`): 刮削; `season` (integer|null): 季号; `skip_success` (boolean; default `False`): 跳过成功历史，优先于重新整理；预览与执行使用相同过滤范围; `target_path` (string|null): 目标路径; `target_storage` (string|null): 目标存储; `transfer_type` (string|null): 整理方式; `type_name` (string|null): 类型
+- `body`: `episode_detail` (string|null): 指定集数; `episode_format` (string|null): 自定义格式; `episode_group` (string|null): 剧集组; `episode_offset` (string|null): 集数偏移; `episode_part` (string|null): 指定PART; `fileitem` (FileItem-Input|null): 文件项; `fileitems` (array<FileItem-Input>|null): 文件项列表（前端多选时传入）; `from_history` (boolean|null; default `False`): 复用历史识别信息; `library_category_folder` (boolean|null): 媒体库类别子目录; `library_type_folder` (boolean|null): 媒体库类型子目录; `logid` (integer|null): 日志ID; `logids` (array<integer>|null): 日志ID列表（前端多选历史记录时传入）; `media_id` (string|null): 数据源原生ID; `media_source` (MediaSource|null): 媒体数据源; `min_filesize` (integer|null; default `0`): 最低文件大小阈值，单位为 MiB；0 不限制，启用时仅保留严格大于阈值的文件; `music_cue_enable` (boolean|null): 本次手动整理是否识别 CUE；空值继承系统设置; `music_release_regions` (array<string>|null): 本次手动整理的 MusicBrainz 发行地区优先级；空值继承系统设置; `music_release_scripts` (array<string>|null): 本次手动整理的 MusicBrainz 文字字形优先级；空值继承系统设置; `music_type` (string(recording,album)|null): 音乐实体类型; `musicbrainz_release_id` (string|null): 显式选择具体发行版；media_id 仍为 Release Group，不能互换; `preview` (boolean|null; default `False`): 仅预览，不执行整理; `reorganize` (boolean|null; default `False`): 重新整理，清理命中的成功历史及其旧目标; `scrape` (boolean|null; default `False`): 刮削; `season` (integer|null): 季号; `skip_success` (boolean; default `False`): 跳过成功历史，优先于重新整理；预览与执行使用相同过滤范围; `target_path` (string|null): 目标路径; `target_storage` (string|null): 目标存储; `transfer_type` (string|null): 整理方式; `type_name` (string|null): 类型
 
 ### `transfer.manual_review`
 `GET /api/v1/transfer/tasks/{task_id}/manual-review`; policy effect: `safe_read`.
@@ -164,7 +164,7 @@ Purpose: 从整理队列移除一个精确存储项目，并停止其整理。
 Identity scope: `bound_user`; required role: `user`.
 - `path_params`: none
 - `query`: none
-- `body`: `basename` (string|null): 不含扩展名的文件基本名称; `children` (array<FileItem-Input>|null): 子节点; `drive_id` (string|null): 云盘驱动器标识; `extension` (string|null): 文件后缀; `fileid` (string|null): 存储服务分配的文件标识; `modify_time` (number|null): 文件修改时间的 Unix 时间戳; `name` (string|null): 文件名; `parent_fileid` (string|null): 父ID; `path` (string|null; default `/`): 文件路径; `pickcode` (string|null): 115 文件下载提取码; `size` (integer|null): 文件大小; `storage` (string|null; default `local`): 存储类型，默认 local 表示本地存储; `thumbnail` (string|null): 缩略图; `type` (string|null): 条目类型，dir 表示目录，file 表示文件; `url` (string|null): 访问地址
+- `body`: `basename` (string|null): 不含扩展名的文件基本名称; `children` (array<FileItem-Input>|null): 子节点; `drive_id` (string|null): 云盘驱动器标识; `extension` (string|null): 文件后缀; `fileid` (string|null): 存储服务分配的文件标识; `modify_time` (number|null): 文件修改时间的 Unix 时间戳，单位为秒，未提供时为 None; `name` (string|null): 文件名; `parent_fileid` (string|null): 父ID; `path` (string|null; default `/`): 文件路径; `pickcode` (string|null): 115 文件下载提取码; `size` (integer|null): 文件大小，单位为字节；目录或来源未提供时可为 None; `storage` (string|null; default `local`): 存储类型，默认 local 表示本地存储; `thumbnail` (string|null): 缩略图; `type` (string|null): 条目类型，dir 表示目录，file 表示文件; `url` (string|null): 访问地址
 
 ### `transfer.target_path`
 `POST /api/v1/transfer/manual/target-path`; policy effect: `safe_read`.
@@ -172,7 +172,7 @@ Purpose: 根据给定源存储项目解析已配置的整理目标。
 Identity scope: `admin`; required role: `system_admin`.
 - `path_params`: none
 - `query`: none
-- `body`: `episode_detail` (string|null): 指定集数; `episode_format` (string|null): 自定义格式; `episode_group` (string|null): 剧集组; `episode_offset` (string|null): 集数偏移; `episode_part` (string|null): 指定PART; `fileitem` (FileItem-Input): storage.list 返回的一个完整源存储项目。; `fileitems` (array<FileItem-Input>|null): 文件项列表（前端多选时传入）; `from_history` (boolean|null; default `False`): 复用历史识别信息; `library_category_folder` (boolean|null): 媒体库类别子目录; `library_type_folder` (boolean|null): 媒体库类型子目录; `logid` (integer|null): 日志ID; `logids` (array<integer>|null): 日志ID列表（前端多选历史记录时传入）; `media_id` (string|null): 数据源原生ID; `media_source` (MediaSource|null): 媒体数据源; `min_filesize` (integer|null; default `0`): 最小文件大小; `music_cue_enable` (boolean|null): 本次手动整理是否识别 CUE；空值继承系统设置; `music_release_regions` (array<string>|null): 本次手动整理的 MusicBrainz 发行地区优先级；空值继承系统设置; `music_release_scripts` (array<string>|null): 本次手动整理的 MusicBrainz 文字字形优先级；空值继承系统设置; `music_type` (string(recording,album)|null): 音乐实体类型; `musicbrainz_release_id` (string|null): 显式选择具体发行版；media_id 仍为 Release Group，不能互换; `preview` (boolean|null; default `False`): 仅预览，不执行整理; `reorganize` (boolean|null; default `False`): 重新整理，清理命中的成功历史及其旧目标; `scrape` (boolean|null; default `False`): 刮削; `season` (integer|null): 季号; `skip_success` (boolean; default `False`): 跳过成功历史，优先于重新整理；预览与执行使用相同过滤范围; `target_path` (string|null): 目标路径; `target_storage` (string|null): 目标存储; `transfer_type` (string|null): 整理方式; `type_name` (string|null): 类型
+- `body`: `episode_detail` (string|null): 指定集数; `episode_format` (string|null): 自定义格式; `episode_group` (string|null): 剧集组; `episode_offset` (string|null): 集数偏移; `episode_part` (string|null): 指定PART; `fileitem` (FileItem-Input|null): 文件项; `fileitems` (array<FileItem-Input>|null): 文件项列表（前端多选时传入）; `from_history` (boolean|null; default `False`): 复用历史识别信息; `library_category_folder` (boolean|null): 媒体库类别子目录; `library_type_folder` (boolean|null): 媒体库类型子目录; `logid` (integer|null): 日志ID; `logids` (array<integer>|null): 日志ID列表（前端多选历史记录时传入）; `media_id` (string|null): 数据源原生ID; `media_source` (MediaSource|null): 媒体数据源; `min_filesize` (integer|null; default `0`): 最低文件大小阈值，单位为 MiB；0 不限制，启用时仅保留严格大于阈值的文件; `music_cue_enable` (boolean|null): 本次手动整理是否识别 CUE；空值继承系统设置; `music_release_regions` (array<string>|null): 本次手动整理的 MusicBrainz 发行地区优先级；空值继承系统设置; `music_release_scripts` (array<string>|null): 本次手动整理的 MusicBrainz 文字字形优先级；空值继承系统设置; `music_type` (string(recording,album)|null): 音乐实体类型; `musicbrainz_release_id` (string|null): 显式选择具体发行版；media_id 仍为 Release Group，不能互换; `preview` (boolean|null; default `False`): 仅预览，不执行整理; `reorganize` (boolean|null; default `False`): 重新整理，清理命中的成功历史及其旧目标; `scrape` (boolean|null; default `False`): 刮削; `season` (integer|null): 季号; `skip_success` (boolean; default `False`): 跳过成功历史，优先于重新整理；预览与执行使用相同过滤范围; `target_path` (string|null): 目标路径; `target_storage` (string|null): 目标存储; `transfer_type` (string|null): 整理方式; `type_name` (string|null): 类型
 
 ## Body Models
 
@@ -246,12 +246,12 @@ This category document is self-contained: the shared models below are included s
 - `drive_id` (string|null): 云盘驱动器标识
 - `extension` (string|null): 文件后缀
 - `fileid` (string|null): 存储服务分配的文件标识
-- `modify_time` (number|null): 文件修改时间的 Unix 时间戳
+- `modify_time` (number|null): 文件修改时间的 Unix 时间戳，单位为秒，未提供时为 None
 - `name` (string|null): 文件名
 - `parent_fileid` (string|null): 父ID
 - `path` (string|null; default `/`): 文件路径
 - `pickcode` (string|null): 115 文件下载提取码
-- `size` (integer|null): 文件大小
+- `size` (integer|null): 文件大小，单位为字节；目录或来源未提供时可为 None
 - `storage` (string|null; default `local`): 存储类型，默认 local 表示本地存储
 - `thumbnail` (string|null): 缩略图
 - `type` (string|null): 条目类型，dir 表示目录，file 表示文件
@@ -287,7 +287,7 @@ This runtime model has no directly writable fields.
 - `category` (string|null): 种子分类 电影/电视剧/音乐
 - `date_elapsed` (string|null): 已过时间
 - `description` (string|null): 种子副标题
-- `downloadvolumefactor` (number|null): 下载因子
+- `downloadvolumefactor` (number|null): 下载统计倍率，例如 0 表示免费下载、0.5 表示按一半下载量计入统计
 - `enclosure` (string|null): 种子链接
 - `freedate` (string|null): 免费截止时间
 - `freedate_diff` (string|null): 剩余免费时间
@@ -308,9 +308,9 @@ This runtime model has no directly writable fields.
 - `site_order` (integer|null; default `0`): 站点优先级
 - `site_proxy` (boolean|null; default `False`): 站点是否使用代理
 - `site_ua` (string|null): 站点UA
-- `size` (number|null; default `0.0`): 种子大小
+- `size` (number|null; default `0.0`): 种子包含的文件总大小，单位为字节
 - `title` (string|null): 种子名称
-- `uploadvolumefactor` (number|null): 上传因子
+- `uploadvolumefactor` (number|null): 上传统计倍率，例如 2 表示按实际上传量的两倍计入站点统计
 - `volume_factor` (string|null): 促销
 
 ### `WorkflowExecutionConfig`

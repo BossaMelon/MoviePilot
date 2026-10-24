@@ -19,7 +19,7 @@ from app.application.site.observation import (
 )
 
 # 站点资源包在启动时加载，静态检查环境可能无法解析其实现。
-from app.application.site.sites import SitesHelper  # pylint: disable=import-error,no-name-in-module
+from app.application.site.sites import SitesHelper
 from app.application.subscription.activity import current_activity_run
 from app.application.subscription.sitebudget import (
     SubscriptionSiteBudget,

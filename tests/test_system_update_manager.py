@@ -457,7 +457,7 @@ def test_ready_resource_update_clears_after_loaded_version_reaches_target(
             "version": "v3.1.0",
             "backend_archive": "/tmp/backend.zip",
             "resource_package_version": "10",
-            "resource_files": [{"name": "user.sites.v3.bin"}],
+            "resource_files": [{"name": "sites.json"}],
         }
     )
     manager._write_item(
@@ -555,7 +555,7 @@ def test_application_download_keeps_prepared_resource_package(monkeypatch, tmp_p
     manager = _manager(monkeypatch, tmp_path)
     resource_dir = manager._resource_dir
     resource_dir.mkdir(parents=True)
-    resource_file = resource_dir / "user.sites.v3.bin"
+    resource_file = resource_dir / "sites.json"
     resource_file.write_bytes(b"resource")
     manager._merge_prepared_manifest(
         {
@@ -615,27 +615,27 @@ def test_application_download_keeps_prepared_resource_package(monkeypatch, tmp_p
 
     prepared = json.loads((manager._root / "prepared.json").read_text(encoding="utf-8"))
     assert prepared["resource_package_version"] == "10"
-    assert prepared["resource_files"][0]["name"] == "user.sites.v3.bin"
+    assert prepared["resource_files"][0]["name"] == "sites.json"
 
 
 def test_resource_manifest_requires_complete_current_platform_package(monkeypatch, tmp_path):
     """
-    资源安装只能接受同时包含索引和当前平台认证文件的完整包。
+    资源安装只能接受仅包含公开 JSON 索引的完整包。
     """
     manager = _manager(monkeypatch, tmp_path)
     monkeypatch.setattr(
         update_module.ResourceHelper,
         "_get_needed_files",
-        classmethod(lambda cls: ["user.sites.v3.bin", "sites.cpython-test.so"]),
+        classmethod(lambda cls: ["sites.json"]),
     )
     resource_dir = manager._resource_dir
     resource_dir.mkdir(parents=True)
-    resource_file = resource_dir / "user.sites.v3.bin"
+    resource_file = resource_dir / "sites.json"
     resource_file.write_bytes(b"resource")
     prepared = {
         "resource_files": [
             {
-                "name": resource_file.name,
+                "name": "sites.bad.so",
                 "path": str(resource_file),
                 "sha256": manager._sha256(resource_file),
             }
@@ -704,6 +704,7 @@ def test_cancel_install_returns_prepared_update_to_ready(monkeypatch, tmp_path):
         ("app", "backup"),
         ("public", "backup"),
         (None, "stage"),
+        (None, "missing-source"),
     ],
 )
 def test_apply_prepared_application_replaces_docker_payload_and_preserves_plugins(
@@ -722,7 +723,7 @@ def test_apply_prepared_application_replaces_docker_payload_and_preserves_plugin
     public_dir.mkdir()
     (plugin_dir / "__init__.py").write_text("# compatibility\n", encoding="utf-8")
     (plugin_dir / "local_plugin.py").write_text("local\n", encoding="utf-8")
-    (resource_dir / "user.sites.v3.bin").write_text("old-resource\n", encoding="utf-8")
+    (resource_dir / "sites.json").write_text("old-resource\n", encoding="utf-8")
     (resource_dir / "legacy.py").write_text("old-source\n", encoding="utf-8")
     (app_dir / "old.py").write_text("old\n", encoding="utf-8")
     (app_dir / "pyproject.toml").write_text("old-project\n", encoding="utf-8")
@@ -738,6 +739,9 @@ def test_apply_prepared_application_replaces_docker_payload_and_preserves_plugin
         archive.writestr("MoviePilot-v3.1.0/pyproject.toml", "[project]\n")
         archive.writestr("MoviePilot-v3.1.0/uv.lock", "version = 1\n")
         archive.writestr("MoviePilot-v3.1.0/new.py", "new\n")
+        if failure != "missing-source":
+            archive.writestr("MoviePilot-v3.1.0/app/application/site/sites.py", "# source")
+            archive.writestr("MoviePilot-v3.1.0/app/application/site/sites.json", '{"version":"2","sites":{}}')
         archive.writestr(
             "MoviePilot-v3.1.0/app/plugins/__init__.py",
             "new compatibility\n",
@@ -804,6 +808,8 @@ def test_apply_prepared_application_replaces_docker_payload_and_preserves_plugin
 
     if failure:
         assert success is False
+        if failure == "missing-source":
+            assert sync_calls == []
         assert (app_dir / "old.py").read_text(encoding="utf-8") == "old\n"
         assert (public_dir / "index.html").read_text(encoding="utf-8") == "old-front\n"
         assert not (app_dir / "new.py").exists()
@@ -823,7 +829,7 @@ def test_apply_prepared_application_replaces_docker_payload_and_preserves_plugin
         encoding="utf-8"
     ) == "new compatibility\n"
     assert (app_dir / "app" / "plugins" / "local_plugin.py").exists()
-    assert (resource_dir / "user.sites.v3.bin").read_text(encoding="utf-8") == "old-resource\n"
+    assert (resource_dir / "sites.json").read_text(encoding="utf-8") == '{"version":"2","sites":{}}'
     assert (resource_dir / "auth.py").read_text(encoding="utf-8") == "new-auth\n"
     assert not (resource_dir / "legacy.py").exists()
     assert (public_dir / "index.html").read_text(encoding="utf-8") == "new-front\n"
@@ -845,19 +851,18 @@ def test_apply_prepared_resources_replaces_complete_docker_resource_package(
     monkeypatch.setattr(
         update_module.ResourceHelper,
         "_get_needed_files",
-        classmethod(lambda cls: ["user.sites.v3.bin", "sites.cpython-test.so"]),
+        classmethod(lambda cls: ["sites.json"]),
     )
     monkeypatch.setattr(update_module, "get_resource_versions", lambda: ("1", "1"))
     resource_dir = manager._docker_app_dir / "app" / "application" / "site"
     resource_dir.mkdir(parents=True)
     (manager._docker_app_dir / "keep.py").parent.mkdir(parents=True, exist_ok=True)
     (manager._docker_app_dir / "keep.py").write_text("keep\n", encoding="utf-8")
-    (resource_dir / "user.sites.v3.bin").write_bytes(b"old-index")
+    (resource_dir / "sites.json").write_bytes(b"old-index")
     (resource_dir / "sites.cpython-old.so").write_bytes(b"old-native")
     prepared_files = []
     for name, content in (
-        ("user.sites.v3.bin", b"new-index"),
-        ("sites.cpython-test.so", b"new-native"),
+        ("sites.json", b"new-index"),
     ):
         path = manager._resource_dir / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -903,15 +908,14 @@ def test_apply_prepared_resources_replaces_complete_docker_resource_package(
 
     if failure:
         assert success is False
-        assert (resource_dir / "user.sites.v3.bin").read_bytes() == b"old-index"
+        assert (resource_dir / "sites.json").read_bytes() == b"old-index"
         assert (resource_dir / "sites.cpython-old.so").read_bytes() == b"old-native"
         assert not (resource_dir / "sites.cpython-test.so").exists()
         assert (manager._root / "prepared.json").exists()
         return
     assert success is True
     assert (manager._docker_app_dir / "keep.py").read_text(encoding="utf-8") == "keep\n"
-    assert (resource_dir / "user.sites.v3.bin").read_bytes() == b"new-index"
-    assert (resource_dir / "sites.cpython-test.so").read_bytes() == b"new-native"
+    assert (resource_dir / "sites.json").read_bytes() == b"new-index"
     assert not (resource_dir / "sites.cpython-old.so").exists()
     assert not manager._install_file.exists()
     assert not (manager._root / "prepared.json").exists()

@@ -261,7 +261,7 @@ RUN set -eu; \
     else \
         frontend_version="${MOVIEPILOT_FRONTEND_VERSION:-$(sed -n "s/^FRONTEND_VERSION[[:space:]]*=[[:space:]]*'\([^']*\)'/\1/p" /tmp/moviepilot-version.py)}"; \
         test -n "${frontend_version}"; \
-        curl -fsSL "https://github.com/jxxghp/MoviePilot-Frontend/releases/download/${frontend_version}/dist.zip" -o /tmp/frontend.zip; \
+        curl -fsSL "https://github.com/BossaMelon/MoviePilot-Frontend/releases/download/${frontend_version}/dist.zip" -o /tmp/frontend.zip; \
         if [ -n "${MOVIEPILOT_FRONTEND_SHA256}" ]; then \
             printf '%s  %s\n' "${MOVIEPILOT_FRONTEND_SHA256}" /tmp/frontend.zip | sha256sum -c -; \
         fi; \
@@ -289,26 +289,8 @@ RUN set -eu; \
 # 准备站点资源
 FROM prepare_payload AS prepare_resources
 
-ARG TARGETARCH
-ARG MOVIEPILOT_RESOURCES_REF="main"
-ARG MOVIEPILOT_PYTHON_VARIANT="standard"
-
-RUN set -eu; \
-    test -n "${MOVIEPILOT_RESOURCES_REF}"; \
-    case "${MOVIEPILOT_PYTHON_VARIANT}" in \
-        standard) python_ver="$(python3 -c 'import sys; print(f"cpython-{sys.version_info.major}{sys.version_info.minor}")')" ;; \
-        free-threaded) python_ver="cpython-314t" ;; \
-        *) printf 'Unsupported Python variant: %s\n' "${MOVIEPILOT_PYTHON_VARIANT}" >&2; exit 1 ;; \
-    esac; \
-    target_arch="${TARGETARCH:-$(uname -m)}"; \
-    case "${target_arch}" in \
-        arm64|aarch64) suffix="aarch64-linux-gnu" ;; \
-        amd64|x86_64) suffix="x86_64-linux-gnu" ;; \
-        *) printf 'Unsupported architecture: %s\n' "${target_arch}" >&2; exit 1 ;; \
-    esac; \
-    mkdir -p /resources; \
-    curl -fsSL "https://raw.githubusercontent.com/jxxghp/MoviePilot-Resources/${MOVIEPILOT_RESOURCES_REF}/resources.v3/user.sites.v3.bin" -o /resources/user.sites.v3.bin; \
-    curl -fsSL "https://raw.githubusercontent.com/jxxghp/MoviePilot-Resources/${MOVIEPILOT_RESOURCES_REF}/resources.v3/sites.${python_ver}-${suffix}.so" -o "/resources/sites.${python_ver}-${suffix}.so"
+# 索引随应用源码交付，无架构或 CPython ABI 依赖。
+COPY app/application/site/sites.json /resources/sites.json
 
 
 # 准备容器控制面

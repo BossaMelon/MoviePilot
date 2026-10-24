@@ -120,7 +120,7 @@ RUN set -eux; \
     test -f /app/app/plugins/__init__.py; \
     rm -rf /frozen/plugins/__pycache__; \
     find /app/app/application/site -maxdepth 1 -type f \
-      \( -name 'sites.*.so' -o -name 'user.sites.v3.bin' \) \
+      \( -name 'sites.py' -o -name 'sites.json' \) \
       -exec cp -a '{}' /frozen/site/ \;
 
 FROM ${MP_SUBSTRATE}
@@ -197,7 +197,7 @@ print(json.dumps({
     "plugins": tree_fingerprint("/app/app/plugins"),
     "site_resources": tree_fingerprint(
         "/app/app/application/site",
-        ("sites.*.so", "user.sites.v3.bin"),
+        ("sites.py", "sites.json"),
     ),
 }, sort_keys=True))
 '''

@@ -144,8 +144,6 @@ OPERATION_DESCRIPTIONS = {
     "search.recommend": "使用已配置推荐模型对种子搜索结果排序或推荐。",
     "search.title": "直接按自由文本标题和可选媒体条件搜索种子站点。",
     "site.add": "使用完整认证与搜索设置创建一个站点。",
-    "site.auth.options": "列出站点账号认证提供方及所需输入定义。",
-    "site.authenticate": "认证受支持站点的账号，并保存取得的站点授权状态。",
     "site.category": "列出指定站点支持的种子分类。",
     "site.cookiecloud.sync": "启动已配置站点的 CookieCloud 同步。",
     "site.delete": "按持久化站点标识删除一个站点。",

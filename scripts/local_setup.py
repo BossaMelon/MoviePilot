@@ -21,7 +21,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import sysconfig
 import tarfile
 import textwrap
 import urllib.parse
@@ -56,13 +55,10 @@ ENV_FILE = CONFIG_DIR / "app.env"
 
 DEFAULT_NODE_VERSION = "20.12.1"
 FRONTEND_LATEST_API = (
-    "https://api.github.com/repos/jxxghp/MoviePilot-Frontend/releases/latest"
+    "https://api.github.com/repos/BossaMelon/MoviePilot-Frontend/releases/latest"
 )
 FRONTEND_TAG_API = (
-    "https://api.github.com/repos/jxxghp/MoviePilot-Frontend/releases/tags/{tag}"
-)
-RESOURCES_MAIN_ZIP = (
-    "https://github.com/jxxghp/MoviePilot-Resources/archive/refs/heads/main.zip"
+    "https://api.github.com/repos/BossaMelon/MoviePilot-Frontend/releases/tags/{tag}"
 )
 RESOURCE_VERSION_FLAG = "v3"
 # 提供商目录不可用时仍能提供常用平台的初始化默认值，不代替运行时能力目录。
@@ -355,7 +351,7 @@ NOTIFICATION_SWITCH_TYPES = [
 ]
 # 卸载第二次确认必须逐字输入此标记，普通回车不能确认删除。
 UNINSTALL_CONFIRM_TEXT = "UNINSTALL"
-RESOURCE_FILE_PATTERNS = ("sites*", "user.sites*.bin")
+RESOURCE_FILE_PATTERNS = ("sites*.so*", "sites*.pyd", "sites*.dylib", "user.sites*.bin")
 AUTOSTART_ENV_KEY = "MOVIEPILOT_AUTO_START"
 AUTOSTART_RUNTIME_DIR = RUNTIME_DIR / "startup"
 AUTOSTART_UNIX_LAUNCHER = AUTOSTART_RUNTIME_DIR / "moviepilot-start.sh"
@@ -1186,49 +1182,40 @@ def install_frontend(
 
 def local_resource_status() -> bool:
     """
-    检查当前平台和 Python 版本所需的全部站点资源文件是否存在。
+    检查站点源码及公开 JSON 索引是否完整。
     """
-    platform_tag, machine = _get_platform_tag()
-    required_files = _get_runtime_resource_filenames(
-        platform_tag,
-        machine,
-        _get_python_version_tag(),
-    )
-    return all((SITE_RESOURCE_DIR / filename).is_file() for filename in required_files)
+    try:
+        _require_runtime_resource_files(SITE_RESOURCE_DIR, "", "", "")
+    except (RuntimeError, OSError):
+        return False
+    return (SITE_RESOURCE_DIR / "sites.py").is_file()
 
 
 def copy_resource_files(source_dir: Path) -> list[str]:
     """
-    完整验证并替换当前运行时所需资源，随后移除其他版本的站点扩展。
+    完整验证并替换公开 JSON 索引，随后移除遗留站点二进制。
 
-    :param source_dir: 包含 v3 站点数据和匹配原生扩展的资源目录
+    :param source_dir: 包含 sites.json 的资源目录
     :return: 本次选中并同步的资源文件名
     :raises FileNotFoundError: 源资源目录不存在
-    :raises RuntimeError: 缺少当前平台与 Python 版本必需的资源
+    :raises RuntimeError: 公开 JSON 索引缺失或格式无效
     """
     if not source_dir.is_dir():
         raise FileNotFoundError(f"资源目录不存在：{source_dir}")
 
-    platform_tag, machine = _get_platform_tag()
-    python_version = _get_python_version_tag()
-    selected = _require_runtime_resource_files(
-        source_dir,
-        platform_tag,
-        machine,
-        python_version,
-    )
+    selected = _require_runtime_resource_files(source_dir, "", "", "")
     SITE_RESOURCE_DIR.mkdir(parents=True, exist_ok=True)
     _replace_resource_files(selected)
 
-    active_native_name = selected[-1].name
     for target in SITE_RESOURCE_DIR.iterdir():
         if (
             target.is_file()
             and target.name.startswith("sites.")
-            and target.suffix.lower() in {".so", ".pyd", ".dylib"}
-            and target.name != active_native_name
+            and (".so" in target.suffixes or target.suffix.lower() in {".pyd", ".dylib"})
         ):
             target.unlink()
+    for target in SITE_RESOURCE_DIR.glob("user.sites*.bin"):
+        target.unlink()
     print_step(f"已同步资源文件到 {SITE_RESOURCE_DIR}")
     return [source.name for source in selected]
 
@@ -1267,55 +1254,16 @@ def _replace_resource_files(selected: list[Path]) -> None:
             raise
 
 
-def _get_platform_tag() -> tuple[str, str]:
-    """
-    归一当前系统与处理器架构，用于匹配站点原生资源文件。
-    """
-    system = platform.system().lower()
-    machine = platform.machine().lower()
-    if system == "darwin":
-        if machine in {"arm64", "aarch64"}:
-            return "darwin", "arm64"
-        if machine in {"x86_64", "amd64"}:
-            return "darwin", "x86_64"
-    elif system == "linux":
-        if machine in {"aarch64", "arm64"}:
-            return "linux", "aarch64"
-        if machine in {"x86_64", "amd64"}:
-            return "linux", "x86_64"
-    elif system == "windows":
-        return "windows", "amd64"
-    raise RuntimeError(f"不支持的平台：{system} / {machine}")
-
-
-def _get_python_version_tag() -> str:
-    """
-    生成站点原生扩展文件使用的 Python 主次版本标记。
-    """
-    version = sys.version_info
-    free_threaded = "t" if sysconfig.get_config_var("Py_GIL_DISABLED") else ""
-    return f"cp{version.major}{version.minor}{free_threaded}"
-
-
 def _get_runtime_resource_filenames(
     platform_tag: str,
     machine: str,
     python_version: str,
-) -> tuple[str, str]:
+) -> tuple[str, ...]:
     """
-    返回当前解释器、系统和架构唯一对应的 V3 资源文件名。
+    返回随应用源码交付的跨平台索引文件名。
     """
-    python_tag = python_version.removeprefix("cp")
-    data_filename = f"user.sites.{RESOURCE_VERSION_FLAG}.bin"
-    if platform_tag == "windows":
-        native_filename = f"sites.cp{python_tag}-win_amd64.pyd"
-    elif platform_tag == "darwin":
-        native_filename = f"sites.cpython-{python_tag}-darwin.so"
-    elif platform_tag == "linux":
-        native_filename = f"sites.cpython-{python_tag}-{machine}-linux-gnu.so"
-    else:
-        raise RuntimeError(f"不支持的平台标签：{platform_tag}")
-    return data_filename, native_filename
+    del platform_tag, machine, python_version
+    return ("sites.json",)
 
 
 def _filter_resources_files(
@@ -1325,7 +1273,7 @@ def _filter_resources_files(
     python_version: str,
 ) -> list[Path]:
     """
-    筛选 V3 资源中与当前 Python 平台匹配的运行文件。
+    筛选公开 JSON 索引，忽略平台及解释器 ABI。
     """
     filenames = _get_runtime_resource_filenames(
         platform_tag,
@@ -1346,7 +1294,7 @@ def _require_runtime_resource_files(
     python_version: str,
 ) -> list[Path]:
     """
-    返回完整运行资源；缺少数据包或原生扩展时拒绝部分同步。
+    返回完整公开索引；缺失或损坏时在修改目标之前拒绝安装。
     """
     required_names = _get_runtime_resource_filenames(
         platform_tag,
@@ -1364,54 +1312,20 @@ def _require_runtime_resource_files(
     if missing_names:
         missing = "、".join(missing_names)
         raise RuntimeError(f"资源目录缺少当前运行时文件：{missing}")
+    try:
+        payload = json.loads((source_dir / "sites.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise RuntimeError("站点索引 JSON 无效") from error
+    if not isinstance(payload, dict) or not payload.get("version") or not isinstance(payload.get("sites"), dict):
+        raise RuntimeError("站点索引必须包含版本号和 sites 字典")
     return matched_files
 
 
 def _download_resources_dir() -> Path:
     """
-    下载资源包并筛选当前运行平台文件，复制到配置临时目录后返回。
-
-    筛选通过后替换旧暂存目录，使返回路径在下载临时目录回收后仍可读取。
+    返回随应用交付的资源目录；不再下载独立站点二进制。
     """
-    with TemporaryDirectory() as temp_dir:
-        temp_path = Path(temp_dir)
-        archive_path = temp_path / "resources.zip"
-        extract_dir = temp_path / "extract"
-        print_step("下载资源包")
-        download_file(RESOURCES_MAIN_ZIP, archive_path)
-        extract_archive(archive_path, extract_dir)
-        source_dir = (
-            extract_dir
-            / "MoviePilot-Resources-main"
-            / f"resources.{RESOURCE_VERSION_FLAG}"
-        )
-        if not source_dir.exists():
-            raise RuntimeError(f"资源压缩包中未找到 resources.{RESOURCE_VERSION_FLAG} 目录")
-
-        platform_name, machine = _get_platform_tag()
-        python_version = _get_python_version_tag()
-        print_step(
-            f"当前平台：{platform_name}-{machine}，Python 版本：{python_version}"
-        )
-
-        matched_files = _require_runtime_resource_files(
-            source_dir,
-            platform_name,
-            machine,
-            python_version,
-        )
-
-        staging_dir = temp_path / "staging"
-        staging_dir.mkdir(parents=True, exist_ok=True)
-        for file in matched_files:
-            target = staging_dir / file.name
-            shutil.copy2(file, target)
-
-        persisted = TEMP_DIR / f"resources.{RESOURCE_VERSION_FLAG}"
-        _remove_path(persisted)
-        shutil.copytree(staging_dir, persisted)
-        print_step(f"已筛选对应平台的资源文件，共 {len(matched_files)} 个")
-        return persisted
+    return SITE_RESOURCE_DIR
 
 
 def _resolve_local_resource_dir(
@@ -1432,9 +1346,7 @@ def _resolve_local_resource_dir(
     if resources_repo:
         repo_dir = resources_repo.expanduser().resolve()
         candidates = [
-            repo_dir / "resources.v3",
-            repo_dir / "resources" / "resources.v3",
-            repo_dir / "resources" / "v3",
+            repo_dir / "app" / "application" / "site",
         ]
         for candidate in candidates:
             if candidate.is_dir():
@@ -1447,16 +1359,20 @@ def install_resources(
     resources_repo: Optional[Path], resource_dir: Optional[Path]
 ) -> list[str]:
     """
-    优先从指定本地目录安装资源，未指定时下载远程资源包。
+    校验随应用交付的公开索引，或事务式安装显式指定的本地 JSON。
 
-    :param resources_repo: 本地资源仓库，可从约定子目录定位 v3 资源
-    :param resource_dir: 直接指定资源目录，优先于 resources_repo
+    :param resources_repo: 本地应用源码仓库，读取其站点 JSON
+    :param resource_dir: 直接指定包含 sites.json 的目录，优先于 resources_repo
     :return: 同步至站点资源目录的文件名列表
     """
     ensure_local_dirs()
     source_dir = _resolve_local_resource_dir(resources_repo, resource_dir)
     if source_dir is None:
-        source_dir = _download_resources_dir()
+        source_dir = SITE_RESOURCE_DIR
+    if source_dir.resolve() == SITE_RESOURCE_DIR.resolve():
+        _require_runtime_resource_files(source_dir, "", "", "")
+        if not (SITE_RESOURCE_DIR / "sites.py").is_file():
+            raise RuntimeError("站点源码 sites.py 缺失，请重新安装应用")
     copied = copy_resource_files(source_dir)
     print_step(f"资源初始化完成，共处理 {len(copied)} 个文件")
     return copied
@@ -2508,187 +2424,6 @@ def _collect_agent_config(
     return config
 
 
-def _empty_site_auth_sync_query(_operation: Any) -> list[Any]:
-    """
-    向导尚未初始化数据库时，将已启用站点查询视为空集。
-    """
-    return []
-
-
-async def _empty_site_auth_async_query(_operation: Any) -> list[Any]:
-    """
-    提供认证目录查询所需的空异步事务结果。
-    """
-    return []
-
-
-def _load_auth_site_definitions_inner() -> dict[str, Any]:
-    """
-    读取站点认证资源定义，不要求初始化向导先创建业务数据库。
-    """
-    if str(ROOT) not in sys.path:
-        sys.path.insert(0, str(ROOT))
-
-    from app.db import uow
-
-    needs_transaction_runner_cleanup = (
-        uow._sync_transaction_runner is None
-        and uow._async_transaction_runner is None
-    )
-    if needs_transaction_runner_cleanup:
-        # 认证字段来自本地资源；向导此时只需字段定义，不需要数据库中的站点记录。
-        uow.configure_transaction_runners(
-            sync=_empty_site_auth_sync_query,
-            async_=_empty_site_auth_async_query,
-        )
-
-    try:
-        # 站点扩展由运行资源提供，源码静态检查时不一定已经安装。
-        from app.application.site.sites import SitesHelper  # pylint: disable=import-error,no-name-in-module
-
-        auth_sites = SitesHelper().get_authsites() or {}
-    finally:
-        if needs_transaction_runner_cleanup:
-            uow.reset_transaction_runners()
-
-    definitions: dict[str, Any] = {}
-    for site_key, site_conf in auth_sites.items():
-        site_name = str(site_conf.get("name") or site_key).strip()
-        params: dict[str, Any] = {}
-        for param_key, param_conf in (site_conf.get("params") or {}).items():
-            params[param_key] = {
-                "name": str(param_conf.get("name") or param_key).strip(),
-                "type": str(param_conf.get("type") or "text").strip().lower(),
-                "placeholder": str(param_conf.get("placeholder") or "").strip(),
-                "tooltip": str(param_conf.get("tooltip") or "").strip(),
-                "convert": str(param_conf.get("convert") or "").strip().lower(),
-            }
-        if params:
-            definitions[site_key] = {
-                "name": site_name,
-                "params": params,
-            }
-    return definitions
-
-
-def _load_auth_site_definitions(
-    runtime_python: Optional[Path] = None,
-) -> dict[str, Any]:
-    """
-    读取站点认证字段定义，当前环境失败时尝试运行解释器，最终失败返回空目录。
-    """
-    try:
-        return _load_auth_site_definitions_inner()
-    except Exception as exc:
-        if runtime_python and not _current_python_matches(runtime_python):
-            try:
-                with TemporaryDirectory() as temp_dir:
-                    output_path = Path(temp_dir) / "auth-sites.json"
-                    subprocess.run(
-                        [
-                            str(runtime_python),
-                            str(Path(__file__).resolve()),
-                            "query-auth-sites",
-                            "--output-json-file",
-                            str(output_path),
-                        ],
-                        cwd=str(ROOT),
-                        check=True,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    )
-                    data = json.loads(output_path.read_text(encoding="utf-8"))
-                    if isinstance(data, dict):
-                        return data
-            except Exception as runtime_exc:
-                print_step(
-                    f"当前环境暂时无法读取站点认证资源，已跳过站点认证配置：{runtime_exc}"
-                )
-                return {}
-
-        print_step(f"当前环境暂时无法读取站点认证资源，已跳过站点认证配置：{exc}")
-        return {}
-
-
-def _print_auth_sites(auth_sites: dict[str, Any]) -> None:
-    """
-    输出可配置站点及认证参数，供终端选择站点标识。
-    """
-    print("可用认证站点：")
-    items = [
-        f"{site_key}({site_conf.get('name') or site_key})"
-        for site_key, site_conf in sorted(auth_sites.items())
-    ]
-    line: list[str] = []
-    for item in items:
-        line.append(item)
-        if len(line) >= 4:
-            print(f"  {'  '.join(line)}")
-            line = []
-    if line:
-        print(f"  {'  '.join(line)}")
-
-
-def _prompt_auth_param(param_key: str, param_meta: dict[str, Any]) -> Any:
-    """
-    按站点字段元数据选择秘密或普通输入；要求整数的字段在转换成功前持续提示。
-    """
-    label = str(param_meta.get("name") or param_key).strip()
-    placeholder = str(param_meta.get("placeholder") or "").strip()
-    tooltip = str(param_meta.get("tooltip") or "").strip()
-    prompt_label = label if not placeholder else f"{label} ({placeholder})"
-    if tooltip:
-        print(f"{prompt_label}：{tooltip}")
-
-    while True:
-        if str(param_meta.get("type") or "text").strip().lower() == "password":
-            value = _prompt_secret_text(prompt_label, required=True)
-        else:
-            value = _prompt_text(prompt_label)
-
-        if str(param_meta.get("convert") or "").strip().lower() != "int":
-            return value
-
-        try:
-            return int(value)
-        except ValueError:
-            print("请输入有效数字。")
-
-
-def _collect_site_auth_config(
-    runtime_python: Optional[Path] = None,
-) -> Optional[dict[str, Any]]:
-    """
-    交互选择站点并收集其认证字段；未选择时不新增站点认证配置。
-    """
-    print_step("用户站点认证配置")
-    if not _prompt_yes_no("是否配置用户站点认证", default=False):
-        return None
-
-    auth_sites = _load_auth_site_definitions(runtime_python=runtime_python)
-    if not auth_sites:
-        print_step("未能读取可用站点认证清单，已跳过用户站点认证配置")
-        return None
-
-    _print_auth_sites(auth_sites)
-    while True:
-        selected_site = _prompt_text("请输入认证站点代号").strip().lower()
-        if selected_site in auth_sites:
-            break
-        print("请输入上面列表中的站点代号。")
-
-    site_conf = auth_sites[selected_site]
-    print_step(f"正在配置站点认证：{site_conf.get('name') or selected_site}")
-    params = {
-        param_key: _prompt_auth_param(param_key, param_meta)
-        for param_key, param_meta in (site_conf.get("params") or {}).items()
-    }
-    return {
-        "site": selected_site,
-        "params": params,
-    }
-
-
 def _collect_autostart_config() -> dict[str, Any]:
     """
     展示现有注册状态并收集是否启用自启的选择，不在此处注册。
@@ -2724,7 +2459,7 @@ def run_setup_wizard(
     :param runtime_python: 读取服务目录时可回退使用的运行环境解释器
     :param preset_superuser: 管理员用户名的预填值
     :param preset_superuser_password: 管理员密码的预填值
-    :return: 环境设置、目录、服务、站点认证和自启选择的配置载荷
+    :return: 环境设置、目录、服务和自启选择的配置载荷
     :raises RuntimeError: 当前输入或输出不是交互式终端
     """
     if not _is_interactive():
@@ -2781,7 +2516,6 @@ def run_setup_wizard(
         "downloader": _collect_downloader_config(),
         "mediaserver": _collect_media_server_config(),
         "notification": _collect_notification_config(),
-        "site_auth": _collect_site_auth_config(runtime_python=runtime_python),
         "autostart": _collect_autostart_config(),
     }
 
@@ -2965,34 +2699,6 @@ def _apply_local_system_config_inner(config_payload: dict[str, Any]) -> None:
             _merge_notification_switches(current_switches),
         )
 
-    site_auth_item = config_payload.get("site_auth")
-    if (
-        isinstance(site_auth_item, dict)
-        and site_auth_item.get("site")
-        and site_auth_item.get("params")
-    ):
-        try:
-            from app.application.site.auth import normalize_site_auth_params
-
-            # 站点扩展由运行资源提供，源码静态检查时不一定已经安装。
-            from app.application.site.sites import SitesHelper  # pylint: disable=import-error,no-name-in-module
-
-            sites_helper = SitesHelper()
-            auth_params = normalize_site_auth_params(
-                site_auth_item.get("site"),
-                site_auth_item.get("params"),
-                sites_helper.get_authsites(),
-            )
-            site_auth_item = {**site_auth_item, "params": auth_params}
-            system_config_service.set(SystemConfigKey.UserSiteAuthParams, site_auth_item)
-            status, msg = sites_helper.check_user(site_auth_item.get("site"), auth_params)
-            if status:
-                print_step(f"站点认证校验成功：{msg}")
-            else:
-                print_step(f"已保存站点认证配置，当前校验未通过：{msg}")
-        except Exception as exc:
-            print_step(f"已保存站点认证配置，当前未完成校验：{exc}")
-
     print_step("已写入本地系统配置")
 
 
@@ -3147,7 +2853,7 @@ def apply_local_system_config(
     """
     把向导载荷应用到系统配置，必要时经临时 JSON 文件交给运行解释器。
 
-    :param config_payload: 向导收集的目录、服务和站点认证等配置
+    :param config_payload: 向导收集的目录和服务等配置
     :param runtime_python: 目标运行解释器；为 None 或匹配当前路径时直接执行
     """
     if _current_python_matches(runtime_python):
@@ -4218,7 +3924,7 @@ def uninstall_local(
     print(f"  - 删除前端运行时目录：{PUBLIC_DIR}")
     print(f"  - 删除本地 Node 运行时目录：{RUNTIME_DIR}")
     print(
-        f"  - 删除资源文件：{SITE_RESOURCE_DIR}/sites*、"
+        f"  - 删除遗留二进制：{SITE_RESOURCE_DIR}/sites*.so*、sites*.pyd、sites*.dylib、"
         f"{SITE_RESOURCE_DIR}/user.sites*.bin"
     )
     if linked_cli_paths:
@@ -4557,21 +4263,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     resources_parser = subparsers.add_parser(
-        "install-resources", help="下载资源文件并同步到 app/application/site"
+        "install-resources", help="校验随应用交付的站点 JSON 索引"
     )
     resources_parser.add_argument(
-        "--resources-repo", help="本地 MoviePilot-Resources 仓库路径"
+        "--resources-repo", help="包含 app/application/site/sites.json 的本地源码仓库"
     )
-    resources_parser.add_argument("--resource-dir", help="直接指定 resources.v3 目录")
+    resources_parser.add_argument("--resource-dir", help="直接指定包含 sites.json 的目录")
     resources_parser.add_argument(
         "--config-dir", help="配置目录，默认使用程序目录外的系统配置目录"
     )
 
     init_parser = subparsers.add_parser("init", help="初始化本地配置与资源文件")
     init_parser.add_argument(
-        "--resources-repo", help="本地 MoviePilot-Resources 仓库路径"
+        "--resources-repo", help="包含 app/application/site/sites.json 的本地源码仓库"
     )
-    init_parser.add_argument("--resource-dir", help="直接指定 resources.v3 目录")
+    init_parser.add_argument("--resource-dir", help="直接指定包含 sites.json 的目录")
     init_parser.add_argument(
         "--skip-resources", action="store_true", help="只初始化配置，不同步资源文件"
     )
@@ -4606,9 +4312,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--node-version", default=DEFAULT_NODE_VERSION, help="本地 Node 运行时版本"
     )
     setup_parser.add_argument(
-        "--resources-repo", help="本地 MoviePilot-Resources 仓库路径"
+        "--resources-repo", help="包含 app/application/site/sites.json 的本地源码仓库"
     )
-    setup_parser.add_argument("--resource-dir", help="直接指定 resources.v3 目录")
+    setup_parser.add_argument("--resource-dir", help="直接指定包含 sites.json 的目录")
     setup_parser.add_argument(
         "--skip-resources", action="store_true", help="只初始化配置，不同步资源文件"
     )
@@ -4715,13 +4421,6 @@ def build_parser() -> argparse.ArgumentParser:
         "sync-superuser", help=argparse.SUPPRESS
     )
     sync_superuser_parser.add_argument("--config-dir", help=argparse.SUPPRESS)
-
-    query_auth_sites_parser = subparsers.add_parser(
-        "query-auth-sites", help=argparse.SUPPRESS
-    )
-    query_auth_sites_parser.add_argument(
-        "--output-json-file", required=True, help=argparse.SUPPRESS
-    )
 
     query_llm_providers_parser = subparsers.add_parser(
         "query-llm-providers", help=argparse.SUPPRESS
@@ -4927,14 +4626,6 @@ def main() -> int:
 
         if args.command == "sync-superuser":
             _sync_superuser_account_inner()
-            return 0
-
-        if args.command == "query-auth-sites":
-            payload = _load_auth_site_definitions_inner()
-            Path(args.output_json_file).write_text(
-                json.dumps(payload, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
             return 0
 
         if args.command == "query-llm-providers":

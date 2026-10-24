@@ -312,8 +312,7 @@ def _prepared_resource_files(module):
     resource_dir.mkdir(parents=True, exist_ok=True)
     resources = []
     for name, content in (
-        ("user.sites.v3.bin", b"index"),
-        ("sites.cpython-test.so", b"auth"),
+        ("sites.json", b'{"version":"1","sites":{}}'),
     ):
         path = resource_dir / name
         path.write_bytes(content)

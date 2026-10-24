@@ -2,7 +2,7 @@
 
 该工具用同一个冻结 Docker substrate 对两个 Git commit 做源码级 A/B。派生镜像会先清空
 `/app`，复制目标 commit 的完整 `git archive`，再从 substrate 注入镜像构建阶段生成的插件目录、
-`sites.*.so` 和 `user.sites.v3.bin`。如果依赖或 Docker substrate 输入发生变化，工具会拒绝继续，
+`sites.py` 和 `sites.json`。如果依赖或 Docker substrate 输入发生变化，工具会拒绝继续，
 避免把外部构建输入漂移误算成性能收益。
 
 工具不会读取工作区或容器内的 `app.env`，不挂载真实配置、媒体目录或 Docker socket。固定配置只使用

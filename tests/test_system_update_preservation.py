@@ -78,7 +78,7 @@ def prepared_resources(monkeypatch, manager):
     """
     创建当前平台完整资源包及可信摘要，复现旧检查留下的 available 状态。
     """
-    names = ["user.sites.v3.bin", "sites.cpython-test.so"]
+    names = ["sites.json"]
     monkeypatch.setattr(
         update_module.ResourceHelper, "_get_needed_files", classmethod(lambda cls: names),
     )
@@ -113,11 +113,11 @@ def test_recover_prepared_resources_and_install_without_downloading(
         assert item.state == "ready"
         assert item.can_install is True
         assert item.can_update is False
-        assert item.downloaded_bytes == item.total_bytes == 16
+        assert item.downloaded_bytes == item.total_bytes == 8
         assert item.progress == 100
     assert (manager._root / "prepared.json").read_bytes() == manifest
     request.assert_not_called()
-    assert len(prepared_resources) == 2
+    assert len(prepared_resources) == 1
     success, _message = manager.request_install("resources")
     assert success is True
     assert json.loads(manager._install_file.read_text())["targets"] == ["resources"]
@@ -134,7 +134,7 @@ def test_unusable_prepared_resources_are_not_restored(manager, prepared_resource
     elif invalid == "modified":
         path.write_bytes(b"changed")
     elif invalid == "incomplete":
-        manager._merge_prepared_manifest({"resource_files": prepared_resources[:1]})
+        manager._merge_prepared_manifest({"resource_files": prepared_resources[:0]})
     elif invalid == "version":
         manager._merge_prepared_manifest({"resource_package_version": "19"})
     else:
@@ -158,4 +158,4 @@ def test_applied_resources_clear_recoverable_package(monkeypatch, manager, prepa
     prepared = manager._read_prepared_manifest()
     assert "resource_files" not in prepared
     assert prepared["version"] == "v3.1.5"
-    assert len(prepared_resources) == 2
+    assert len(prepared_resources) == 1

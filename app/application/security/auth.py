@@ -15,7 +15,7 @@ from app.application.security.token import create_access_token
 from app.application.security.user import FrozenJson
 
 # 站点目录由资源扩展提供，静态环境可能没有生成模块，保留现有导入检查豁免。
-from app.application.site.sites import SitesHelper  # pylint: disable=import-error,no-name-in-module
+from app.application.site.sites import SitesHelper
 from app.foundation.singleton import Singleton
 from app.schemas.token import Token as _SchemaToken
 from app.schemas.token import TokenPayload as _SchemaTokenPayload

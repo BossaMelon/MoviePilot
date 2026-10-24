@@ -179,13 +179,15 @@ def ensure_sites_stub() -> None:
     在进程模块缓存中安装确定性的站点资源占位。
 
     必须在业务模块导入前调用；始终替换该模块，即使本机存在真实扩展。
-    此修改持续到进程结束或由调用方恢复，真实资源的加载和 ABI 由专项测试验证。
+    此修改持续到进程结束或由调用方恢复，真实 Python 目录的加载和行为由专项测试验证。
     """
     from importlib.util import spec_from_loader
     from types import ModuleType
 
     stub = ModuleType("app.application.site.sites")
     setattr(stub, "SitesHelper", _SitesHelperStub)
+    setattr(stub, "configure_site_repository", lambda repository: None)
+    setattr(stub, "reset_site_catalog", lambda: None)
     stub.__spec__ = spec_from_loader("app.application.site.sites", None)
     sys.modules["app.application.site.sites"] = stub
 

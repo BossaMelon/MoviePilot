@@ -278,7 +278,7 @@ CI 上传 `complexity-report` 工件，门禁失败时也保留已生成的指�
 `tests/fixtures/architecture/mypy-policy.json` 中每项兼容原因、所属方法、错误码和语法指纹。
 保留例外涉及异步工具旧接口、动态 Facade 描述符、运行时 MRO/元类、FastAPI Response
 注入默认值和供应方类型限制；
-例外只作用于登记语句，方法体继续严格检查。二进制站点接口的 `sites.pyi` 按文件摘要登记。
+例外只作用于登记语句，方法体继续严格检查。站点目录已改为 Python 源码，按普通宿主模块检查，不再登记二进制接口例外。
 
 门禁拒绝新增或变化的 `type: ignore`、没有错误码的忽略、`no_type_check`、文件内 mypy
 配置和未经复核的本地类型桩；同时锁定完整 mypy 配置，防止缩小检查范围或扩大导入豁免。

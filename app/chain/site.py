@@ -8,7 +8,7 @@ import threading
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, replace
 from datetime import datetime
-from typing import Any, Callable, Dict, Mapping, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Dict, Mapping, Optional, Protocol, Tuple, Union, cast
 from urllib.parse import urljoin, urlparse
 
 from lxml import etree
@@ -24,9 +24,7 @@ from app.application.site.contract import (
     SiteSnapshot,
     SiteUserDataMutation,
 )
-
-# 站点资源包在启动时加载，静态检查环境可能无法解析其实现。
-from app.application.site.sites import SitesHelper  # pylint: disable=import-error,no-name-in-module
+from app.application.site.sites import SitesHelper
 from app.chain._interaction import InteractionChainMixin
 from app.chain.base import ChainBase
 from app.domain import site as site_rules
@@ -877,7 +875,7 @@ class SiteChain(InteractionChainMixin, ChainBase):
             logger.warning(f"站点 {domain} 已在黑名单中，不添加站点")
             return 0, 0, 0, False
         domain_url = self._cookiecloud_indexer_domain(indexer, domain)
-        login_url = site_rules.resolve_page_url(domain_url, indexer.get("login_path"))
+        login_url = site_rules.resolve_page_url(domain_url, cast(str | None, indexer.get("login_path")))
         proxy, response = self._cookiecloud_connect(login_url, cookie, indexer)
         if response is None:
             return 0, 0, 1, False
@@ -1087,7 +1085,7 @@ class SiteChain(InteractionChainMixin, ChainBase):
                         replace(
                             site_info,
                             url=site_rules.resolve_page_url(
-                                site_info.url, indexer.get("login_path")
+                                site_info.url, cast(str | None, indexer.get("login_path"))
                             ),
                         )
                     )

@@ -1278,6 +1278,10 @@ def test_failed_dependency_sync_does_not_replace_program_files(tmp_path: Path) -
     (update_tree / "app" / "plugins" / "__init__.py").write_text(
         "# legacy plugin compatibility entrypoint\n", encoding="utf-8"
     )
+    site_dir = update_tree / "app" / "application" / "site"
+    site_dir.mkdir(parents=True)
+    (site_dir / "sites.py").write_text("# source", encoding="utf-8")
+    (site_dir / "sites.json").write_text('{"version":"1","sites":{}}', encoding="utf-8")
     (update_tree / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
     (update_tree / "uv.lock").write_text("version = 1\n", encoding="utf-8")
     (update_tree / "version.py").write_text("FRONTEND_VERSION = 'v3.0.1'\n", encoding="utf-8")
@@ -1649,44 +1653,54 @@ def test_restore_does_not_nest_previous_app_when_current_removal_fails(tmp_path:
     assert result.stdout == "current|absent|retained|clean\n"
 
 
-def test_staged_resource_download_rejects_empty_response_and_keeps_fallback(
-    tmp_path: Path,
+@pytest.mark.parametrize("missing", ["sites.py", "sites.json"])
+def test_staged_payload_rejects_binary_only_resources_without_downloading(
+    tmp_path: Path, missing: str
 ) -> None:
     """
-    暂存资源下载为空时拒绝新内容，保留旧资源回退。
+    缺少源码索引时拒绝旧二进制载荷，不下载资源也不继承旧文件。
     """
-    destination = tmp_path / "stage" / "sites.bin"
-    fallback = tmp_path / "live" / "sites.bin"
-    destination.parent.mkdir()
-    fallback.parent.mkdir()
-    fallback.write_text("old-resource\n", encoding="utf-8")
+    live = tmp_path / "live"
+    stage = tmp_path / "stage"
+    plugins = stage / "App" / "app" / "plugins"
+    sites = stage / "App" / "app" / "application" / "site"
+    plugins.mkdir(parents=True)
+    sites.mkdir(parents=True)
+    live.mkdir()
+    (live / "user.sites.v3.bin").write_text("old-resource", encoding="utf-8")
+    (plugins / "__init__.py").write_text("# package", encoding="utf-8")
+    for name in ("sites.py", "sites.json"):
+        if name != missing:
+            (sites / name).write_text("source", encoding="utf-8")
+    (sites / "sites.cpython-test.so").write_text("binary", encoding="utf-8")
+    for name in ("version.py", "pyproject.toml", "uv.lock"):
+        (stage / "App" / name).write_text("source", encoding="utf-8")
+    (stage / "dist").mkdir()
+    (stage / "dist" / "index.html").write_text("frontend", encoding="utf-8")
+    network_log = tmp_path / "network.log"
     script = textwrap.dedent(
         f"""\
         source {UPDATER!s}
+        APP_DIR="$1"
+        TMP_PATH="$2"
         INFO() {{ :; }}
         WARN() {{ :; }}
         ERROR() {{ :; }}
-        curl() {{ return 0; }}
-        download_staged_resource https://resources.example/sites.bin \\
-            "$1" "$2" sites.bin
-        cat "$1"
+        curl() {{ printf attempted > "$3"; return 1; }}
+        declare -F download_staged_resource && exit 42
+        stage_runtime_payload
         """
     )
     result = subprocess.run(
-        [
-            "/bin/bash",
-            "-c",
-            script,
-            "resource-download-test",
-            str(destination),
-            str(fallback),
-        ],
+        ["bash", "-c", script, "source-resource-test", str(live), str(stage), str(network_log)],
         text=True,
         capture_output=True,
-        check=True,
+        check=False,
     )
-
-    assert result.stdout == "old-resource\n"
+    assert result.returncode == 1
+    assert not network_log.exists()
+    assert (live / "user.sites.v3.bin").read_text(encoding="utf-8") == "old-resource"
+    assert not (sites / "user.sites.v3.bin").exists()
 
 
 def test_staged_payload_swap_failure_restores_previous_generation(tmp_path: Path) -> None:

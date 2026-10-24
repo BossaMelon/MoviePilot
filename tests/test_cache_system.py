@@ -161,7 +161,6 @@ def test_init_modules_does_not_clear_package_tool_cache(monkeypatch):
     monkeypatch.setattr(modules_initializer, "configure_doh_composition", lambda: None)
     monkeypatch.setattr(modules_initializer, "SitesHelper", lambda: None)
     monkeypatch.setattr(modules_initializer, "update_resources", lambda: None)
-    monkeypatch.setattr(modules_initializer, "user_auth", lambda: None)
     monkeypatch.setattr(modules_initializer, "ModuleManager", lambda: None)
     monkeypatch.setattr(modules_initializer.EventManager, "start", lambda self: None)
     monkeypatch.setattr(modules_initializer.MoviePilotServerHelper, "async_init_plugin_report", AsyncMock())
@@ -171,7 +170,6 @@ def test_init_modules_does_not_clear_package_tool_cache(monkeypatch):
     init_agent = AsyncMock()
     monkeypatch.setattr(modules_initializer, "init_agent", init_agent)
     monkeypatch.setattr(modules_initializer, "start_frontend", lambda: None)
-    monkeypatch.setattr(modules_initializer, "check_auth", lambda: None)
 
     async def initialize_modules() -> None:
         try:

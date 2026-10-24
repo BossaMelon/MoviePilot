@@ -16,9 +16,6 @@ if TYPE_CHECKING:
 
         _agent_task_interruptions_reconciled: bool
         _agent_tasks: AgentTaskRepository | None
-        _auth_count: int
-        _auth_message: bool
-        _auth_plugin_routes_pending: bool
         _event: Any
         _jobs: dict[str, dict[str, Any]]
         _lifecycle_state: str
@@ -72,7 +69,6 @@ if TYPE_CHECKING:
         update_agent_task_job: Callable[..., Any]
         update_plugin_job: Callable[..., None]
         update_workflow_job: Callable[..., None]
-        user_auth: Callable[..., Any]
 
     class _SchedulerOwnerBase(_SchedulerOwnerHost):
         """

@@ -89,7 +89,7 @@ from app.application.plugin.transaction import (
     get_plugin_persistence,
 )
 from app.application.scheduling import update_plugin_job
-from app.application.site.sites import SitesHelper  # pylint: disable=import-error,no-name-in-module
+from app.application.site.sites import SitesHelper
 from app.db.adapters.pluginidentity import TransactionalPluginIdentityStore
 from app.db.models.plugininstance import PluginInstance as PluginInstanceRecord
 from app.db.oper.plugindata import PluginDataOper

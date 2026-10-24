@@ -447,12 +447,9 @@ SYSTEMCONFIG_CONTRACTS: dict[SystemConfigKey, _SystemConfigContract] = {
     SystemConfigKey.DefaultMusicSubscribeConfig: _contract(
         "subscribe_defaults", Optional[Subscribe], operations=_OBJECT_OPERATIONS
     ),
-    SystemConfigKey.UserSiteAuthParams: _managed_contract(
-        "site_auth",
-        Optional[list[SiteAuth]],
-        "site.auth.options",
-        "site.authenticate",
-        sensitive=True,
+    # 保留旧数据库键以兼容已有配置，但不再提供认证或写入操作。
+    SystemConfigKey.UserSiteAuthParams: _internal_contract(
+        "legacy_site_auth", Optional[list[SiteAuth]], sensitive=True,
     ),
     SystemConfigKey.FollowSubscribers: _managed_contract(
         "subscribe_sharing",

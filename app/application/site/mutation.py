@@ -132,7 +132,6 @@ class SiteMutationCommand:
         *,
         repository: SiteStagingPort,
         unit_of_work: AsyncUnitOfWork,
-        auth_level_provider: Callable[[], int],
         indexer_loader: SiteIndexerLoader,
         domain_extractor: DomainExtractor,
         url_normalizer: UrlNormalizer,
@@ -144,7 +143,6 @@ class SiteMutationCommand:
         """
         self._repository = repository
         self._unit_of_work = unit_of_work
-        self._auth_level_provider = auth_level_provider
         self._indexer_loader = indexer_loader
         self._domain_extractor = domain_extractor
         self._url_normalizer = url_normalizer
@@ -162,8 +160,6 @@ class SiteMutationCommand:
         raw_url = values.get("url")
         if not isinstance(raw_url, str) or not raw_url:
             return SiteMutationResult(False, "站点地址不能为空")
-        if self._auth_level_provider() < 2:
-            return SiteMutationResult(False, "用户未通过认证，无法使用站点功能！")
 
         domain = self._domain_extractor(raw_url)
         site_info = await self._indexer_loader(domain)

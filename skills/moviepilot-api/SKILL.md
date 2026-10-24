@@ -36,11 +36,11 @@ allowed-api-operations: >-
   media.classification.policy.history media.classification.policy.update
   media.classification.policy.rollback media.episode_groups media.episode_group.seasons
   media.seasons search.title search.recommend subtitle.search.title subtitle.search.media site.add
-  site.delete site.auth.options site.authenticate site.cookiecloud.sync site.cookie.set site.reset
-  site.priorities.update site.userdata.refresh site.userdata.latest site.category site.resource
-  site.searchable site.rss site.statistics site.statistic site.mapping site.supporting
-  subscription.get subscription.find subscription.delete_by_media subscription.status.update
-  subscription.reset subscription.search_all subscription.refresh subscription.metadata.refresh
+  site.delete site.cookiecloud.sync site.cookie.set site.reset site.priorities.update
+  site.userdata.refresh site.userdata.latest site.category site.resource site.searchable site.rss
+  site.statistics site.statistic site.mapping site.supporting subscription.get subscription.find
+  subscription.delete_by_media subscription.status.update subscription.reset
+  subscription.search_all subscription.refresh subscription.metadata.refresh
   subscription.history.delete subscription.user.list subscription.files
   subscription.execution.list subscription.execution.get subscription.execution.cancel
   subscription.share subscription.share.delete subscription.fork subscription.follow.list

@@ -54,9 +54,7 @@ from app.application.scheduling import get_scheduler
 from app.application.security.image import normalize_image_domain, site_image_domains
 from app.application.security.url import SecurityUtils
 from app.application.site.query import get_configured_site_query_service
-
-# 站点目录由外部资源加载，静态检查无法解析其动态导出。
-from app.application.site.sites import SitesHelper  # pylint: disable=import-error,no-name-in-module
+from app.application.site.sites import SitesHelper
 from app.application.system import LogFileData, LogNotFoundError
 from app.chain.media import MediaChain
 from app.chain.mediaserver import MediaServerChain

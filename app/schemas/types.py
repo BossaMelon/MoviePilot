@@ -483,7 +483,7 @@ class SystemConfigKey(Enum):
     DefaultTvSubscribeConfig = "DefaultTvSubscribeConfig"
     # 默认音乐订阅规则
     DefaultMusicSubscribeConfig = "DefaultMusicSubscribeConfig"
-    # 用户站点认证参数
+    # 旧平台资格参数，仅兼容历史数据，不再参与认证。
     UserSiteAuthParams = "UserSiteAuthParams"
     # Follow订阅分享者
     FollowSubscribers = "FollowSubscribers"

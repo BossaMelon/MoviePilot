@@ -8,9 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Union, cast
 
 from app.application.configuration import get_configured_system_config
 from app.application.rss import RssHelper
-
-# 站点资源包在启动时加载，静态检查环境可能无法解析其实现。
-from app.application.site.sites import SitesHelper  # pylint: disable=import-error,no-name-in-module
+from app.application.site.sites import SitesHelper
 from app.application.subscription.candidates import CandidateIndex
 from app.application.subscription.contract import SubscriptionSnapshot
 from app.application.torrent.download import TorrentHelper
@@ -359,8 +357,8 @@ class TorrentsChain(ChainBase):
             logger.warning(f'站点 {domain} RSS地址无效，跳过获取')
             return []
         rss_items = RssHelper().parse(rss_url, True if site.get("proxy") else False,
-                                      timeout=int(site.get("timeout") or 30),
-                                      ua=site.get("ua") if site.get("ua") else None)
+                                      timeout=int(cast(int | None, site.get("timeout")) or 30),
+                                      ua=cast(str | None, site.get("ua")) if cast(str | None, site.get("ua")) else None)
         if rss_items is None:
             # rss过期，尝试保留原配置生成新的rss
             self.__renew_rss_url(domain=domain, site=site)
@@ -383,13 +381,13 @@ class TorrentsChain(ChainBase):
                 if not item.get("title"):
                     continue
                 torrentinfo = TorrentInfo(
-                    site=site.get("id"),
-                    site_name=site.get("name"),
-                    site_cookie=site.get("cookie"),
-                    site_ua=site.get("ua") or self.runtime_config.user_agent,
+                    site=cast(int | None, site.get("id")),
+                    site_name=cast(str | None, site.get("name")),
+                    site_cookie=cast(str | None, site.get("cookie")),
+                    site_ua=cast(str | None, site.get("ua")) or self.runtime_config.user_agent,
                     site_proxy=bool(site.get("proxy")),
-                    site_order=int(site.get("pri") or 0),
-                    site_downloader=site.get("downloader"),
+                    site_order=int(cast(int | None, site.get("pri")) or 0),
+                    site_downloader=cast(str | None, site.get("downloader")),
                     title=item.get("title"),
                     enclosure=item.get("enclosure"),
                     page_url=item.get("link"),
@@ -760,16 +758,16 @@ class TorrentsChain(ChainBase):
             logger.error(f"站点 {domain} RSS链接已过期，正在尝试自动获取！")
             # 自动生成rss地址
             site_url = site.get("url")
-            site_cookie = site.get("cookie")
+            site_cookie = cast(str | None, site.get("cookie"))
             site_rss = site.get("rss")
             if not isinstance(site_url, str) or not isinstance(site_cookie, str) or not isinstance(site_rss, str):
                 return
             rss_url, errmsg = RssHelper().get_rss_link(
                 url=site_url,
                 cookie=site_cookie,
-                ua=site.get("ua") or self.runtime_config.user_agent,
+                ua=cast(str | None, site.get("ua")) or self.runtime_config.user_agent,
                 proxy=True if site.get("proxy") else False,
-                timeout=site.get("timeout"),
+                timeout=cast(int | None, site.get("timeout")),
             )
             if rss_url:
                 # 获取新的日期的passkey

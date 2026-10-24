@@ -111,12 +111,6 @@ class Scheduler(
         self._registry = ExecutionRegistry(self._lock)
         # 进程启动时只对账一次，配置热重载不得改写仍在执行的任务状态
         self._agent_task_interruptions_reconciled = False
-        # 用户认证失败次数
-        self._auth_count = 0
-        # 用户认证失败消息发送
-        self._auth_message = False
-        # 插件已按认证结果重建，但动态路由尚未完成投影时保留重试状态。
-        self._auth_plugin_routes_pending = False
         self._agent_tasks: AgentTaskRepository | None = None
         self._services: SchedulerServices | None = None
 

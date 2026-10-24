@@ -30,7 +30,6 @@ def _command(**overrides):
     dependencies = {
         "repository": repository,
         "unit_of_work": unit_of_work,
-        "auth_level_provider": Mock(return_value=2),
         "indexer_loader": AsyncMock(return_value={"name": "Demo", "public": True}),
         "domain_extractor": lambda value: "demo.example",
         "url_normalizer": lambda value: "https://demo.example/",

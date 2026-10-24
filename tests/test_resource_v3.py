@@ -8,79 +8,31 @@ import pytest
 
 from app.adapters.system.resource import (
     ResourceHelper,
-    configure_resource_version_provider,
 )
-from app.runtime.config import settings
 from app.startup.composition import resource as resource_composition
 from app.startup.initializers import modules as modules_initializer
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 
-def test_resource_helper_uses_v3_only():
+def test_resource_helper_uses_source_index_only():
     """
-    在线资源更新器必须只请求 V3 清单、目录和站点索引文件。
+    独立更新器只认公开 JSON，不访问二进制仓库。
     """
-    assert settings.VERSION_FLAG == "v3"
-    assert settings.RESOURCE_VERSION_FLAG == "v3"
-    assert ResourceHelper._repo.endswith("/package.v3.json")
-    assert ResourceHelper._files_api.endswith("/resources.v3")
-    assert ResourceHelper._get_needed_files()[0] == "user.sites.v3.bin"
+    assert ResourceHelper._get_needed_files() == ["sites.json"]
     assert ResourceHelper._resource_target == Path("app/application/site")
-
-
-@pytest.mark.parametrize(
-    ("system", "machine", "gil_disabled", "expected"),
-    [
-        ("Linux", "x86_64", 0, "sites.cpython-314-x86_64-linux-gnu.so"),
-        ("Linux", "aarch64", 1, "sites.cpython-314t-aarch64-linux-gnu.so"),
-        ("Darwin", "arm64", 1, "sites.cpython-314t-darwin.so"),
-        ("Windows", "AMD64", 1, "sites.cp314t-win_amd64.pyd"),
-    ],
-)
-def test_resource_helper_selects_runtime_abi(
-    monkeypatch,
-    system,
-    machine,
-    gil_disabled,
-    expected,
-):
-    """
-    资源下载文件名必须区分普通解释器与 free-threaded ABI。
-    """
-    monkeypatch.setattr("app.adapters.system.resource.platform.system", lambda: system)
-    monkeypatch.setattr("app.adapters.system.resource.platform.machine", lambda: machine)
-    monkeypatch.setattr(
-        "app.adapters.system.resource.sysconfig.get_config_var",
-        lambda name: gil_disabled if name == "Py_GIL_DISABLED" else None,
-    )
-
-    assert ResourceHelper._get_needed_files()[-1] == expected
-
-
-def test_resource_helper_preserves_no_argument_check_contract(monkeypatch):
-    """
-    旧插件无参数调用 check 时应使用启动层注入版本，不反向导入站点应用。
-    """
-    provider_calls = []
-
-    def provide_versions() -> tuple[str, str]:
-        """
-        记录资源更新器是否读取了组合根注入的版本。
-        """
-        provider_calls.append(True)
-        return "2.4.10", "3.0.2"
-
-    configure_resource_version_provider(provide_versions)
-    monkeypatch.setattr(ResourceHelper, "_load_resource_info", lambda _self: None)
-    monkeypatch.setattr("app.adapters.system.resource.settings.AUTO_UPDATE_RESOURCE", True)
-    monkeypatch.setattr(
-        "app.adapters.system.resource.SystemUtils.is_frozen",
-        lambda: False,
-    )
-
+    assert ResourceHelper().get_update_info(auth_version="0", indexer_version="0") is None
     assert ResourceHelper().check() is False
-    assert provider_calls == [True]
+
+
+def test_resource_helper_rejects_legacy_download(tmp_path):
+    """
+    旧插件也不能通过下载兼容入口恢复二进制。
+    """
+    with pytest.raises(RuntimeError, match="源码"):
+        ResourceHelper().get_download_files({"files": [{"name": "sites.bad.so"}]})
+    with pytest.raises(RuntimeError, match="源码"):
+        ResourceHelper().download_files([], tmp_path)
 
 
 def test_startup_resource_hook_only_configures_version_provider(monkeypatch):
@@ -121,7 +73,7 @@ def test_install_and_docker_paths_do_not_reference_v2_resources():
         content = path.read_text(encoding="utf-8")
         assert "resources.v2" not in content
         assert "user.sites.v2.bin" not in content
-        assert "resources.v3" in content
+        assert "sites.json" in content
         assert "app/application/site" in content
 
 
@@ -156,3 +108,15 @@ def test_v3_release_workflows_use_main_wiki_and_isolated_images():
     assert "${{ secrets.DOCKER_USERNAME }}/moviepilot-v3" in beta_workflow
     assert "ghcr.io/${{ github.repository }}-v3" in beta_workflow
     assert "${{ secrets.DOCKER_USERNAME }}/moviepilot-v2" not in beta_workflow
+
+
+def test_frontend_install_and_update_only_use_fork():
+    """
+    构建、安装与更新入口只能获取 fork 前端，避免恢复平台认证界面。
+    """
+    for relative in ("app/adapters/system/update.py", "scripts/local_setup.py", "docker/Dockerfile", "docker/update.sh"):
+        source = (ROOT_DIR / relative).read_text(encoding="utf-8")
+        assert "BossaMelon/MoviePilot-Frontend" in source
+        assert "jxxghp/MoviePilot-Frontend" not in source
+    overlay = (ROOT_DIR / "docker/Dockerfile.local-site-mode").read_text(encoding="utf-8")
+    assert "COPY frontend-dist/ /public/" in overlay

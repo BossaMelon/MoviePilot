@@ -4,16 +4,7 @@
 
 import asyncio
 import inspect
-import sys
-from typing import Any, Callable, cast
-
-# SitesHelper涉及资源包拉取，提前引入并容错提示
-try:
-    from app.application.site.sites import SitesHelper as _SitesHelper  # noqa  # pylint: disable=import-error,no-name-in-module
-except ImportError as e:
-    error_message = f"错误: {str(e)}\n站点认证及索引相关资源导入失败，请尝试重建容器或手动拉取资源"
-    print(error_message, file=sys.stderr)
-    sys.exit(1)
+from typing import Callable, cast
 
 from app.adapters.external.server import MoviePilotServerHelper
 from app.adapters.system.host import SystemUtils
@@ -44,8 +35,11 @@ from app.application.outbox import configure_outbox_dispatcher
 from app.application.plugin.runtime import get_existing_plugin_manager
 from app.application.security.url import close_image_proxy_block_log_coalescer
 from app.application.service import configure_service_directory, reset_service_directory
-from app.application.site.auth import normalize_site_auth_config
-from app.command import CommandChain
+from app.application.site.sites import (
+    SitesHelper,
+    configure_site_repository,
+    reset_site_catalog,
+)
 from app.db.session import (
     close_database,
 )
@@ -66,8 +60,7 @@ from app.runtime.settings import (
 from app.runtime.tasks import get_task_registry
 from app.runtime.thread import ThreadHelper
 from app.schemas.category import ClassificationFactValue, ClassificationFieldDefinition
-from app.schemas.message import Message
-from app.schemas.types import EventType, MessageType, SystemConfigKey
+from app.schemas.types import EventType
 from app.startup.composition.agent import (
     compose_agent,
     publish_agent_services,
@@ -141,8 +134,6 @@ from app.startup.initializers.scheduler import (
     configure_scheduler_agent_tasks,
     reset_scheduler_bindings,
 )
-
-SitesHelper: Any = _SitesHelper
 
 
 def _plugin_classification_fields() -> tuple[ClassificationFieldDefinition, ...]:
@@ -246,6 +237,7 @@ def _module_provider_reset_steps() -> tuple[tuple[str, Callable[[], object]], ..
     return (
         ("事件服务", reset_event_services),
         ("资源版本 Provider", reset_site_resource_composition),
+        ("站点目录", reset_site_catalog),
         ("认证访问服务", reset_security_access),
         ("Chain 服务", reset_chain_services),
         ("托管资源引用", reset_managed_resources),
@@ -508,47 +500,8 @@ def clear_package_tool_cache() -> None:
             logger.warning("清理包下载缓存失败：%s - %s", cache_path, err)
 
 
-def user_auth() -> None:
-    """
-    用户认证检查
-    """
-    sites_helper = SitesHelper()
-    if sites_helper.auth_level >= 2:
-        return
-    auth_conf = get_configured_system_config().get(SystemConfigKey.UserSiteAuthParams)
-    if get_runtime_setting("AUTH_SITE"):
-        status, msg = sites_helper.check_user()
-    else:
-        normalized_auth_conf = normalize_site_auth_config(
-            auth_conf,
-            sites_helper.get_authsites(),
-        )
-        status, msg = (
-            sites_helper.check_user(**normalized_auth_conf)
-            if normalized_auth_conf
-            else sites_helper.check_user()
-        )
-    if status:
-        logger.info(f"{msg} 用户认证成功")
-    else:
-        logger.info(f"用户认证失败，{msg}")
 
 
-def check_auth() -> None:
-    """
-    检查认证状态
-    """
-    if SitesHelper().auth_level < 2:
-        err_msg = "用户认证失败，站点相关功能将无法使用！"
-        MessageHelper().put(f"注意：{err_msg}", title="用户认证", role="system", level="warning")
-        CommandChain().post_message(
-            Message(
-                mtype=MessageType.Manual,
-                title="MoviePilot用户认证",
-                text=err_msg,
-                link=get_runtime_setting("MP_DOMAIN")("#/site"),
-            )
-        )
 
 
 def update_resources() -> None:
@@ -762,6 +715,7 @@ async def _initialize_modules() -> HostRuntime:
         )
     )
     host_runtime = runtime_composition.runtime
+    configure_site_repository(host_runtime.site.standalone)
     publish_database_services(database_services)
     publish_runtime(runtime_composition)
     configure_runtime_data_providers()
@@ -806,8 +760,6 @@ async def _initialize_modules() -> HostRuntime:
     configure_site_resource_versions(
         lambda: (sites_helper.auth_version, sites_helper.indexer_version)
     )
-    # 用户认证
-    user_auth()
     # 事件错误通知由启动组合层接入消息服务。
     EventManager().set_error_notifier(notify_event_error)
     # WebAgent 事件监听由组合根统一装配，HTTP 请求只管理自己的队列。
@@ -832,8 +784,6 @@ async def _initialize_modules() -> HostRuntime:
     await init_agent()
     # 启动前端服务
     start_frontend()
-    # 检查认证状态
-    check_auth()
     return host_runtime
 
 

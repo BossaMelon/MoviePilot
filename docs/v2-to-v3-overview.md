@@ -360,45 +360,31 @@ V3 为插件整理了网络、缓存、日志、媒体、配置、事件、服�
 
 ## 7. 站点资源与构建体系变化
 
-### 7.1 V3 使用独立站点资源通道
+### 7.1 本 fork 使用源码站点目录
 
-V3 不再读取 V2 的站点索引包，而是使用：
-
-```text
-MoviePilot-Resources/resources.v3/
-├── user.sites.v3.bin
-└── sites.*.so / sites.*.pyd
-```
-
-- `user.sites.v3.bin` 保存站点搜索、分类和字段解析规则。
-- `sites.*.so/.pyd` 保存按平台和 Python ABI 构建的站点认证能力。
-- 运行时统一安装到主程序的 `app/application/site/` 目录。
-- V2 与 V3 使用不同资源清单，不会互相覆盖。
-
-### 7.2 站点资源从源文件到用户设备的发布链路
+站点索引现在直接随应用交付：
 
 ```text
-MoviePilot-Build
-  站点 YAML、认证配置、解析源码、资源版本
-        ↓ 自动构建与测试
-MoviePilot-Resources/resources.v3
-  V3 索引包、各平台认证扩展、package.v3.json
-        ↓ Docker 构建或运行时资源更新
-MoviePilot/app/application/site
-  当前实例实际加载的站点资源
+app/application/site/
+├── sites.py
+└── sites.json
 ```
 
-这条链路让“站点页面改版”与“主程序功能发布”可以分开处理。很多站点选择器或分类修复只需要更新资源包，不必等待整个后端发版。
+Python 实现负责目录查询、配置合并和流控；JSON 保存可审查的站点解析规则。平台资格认证步骤已移除，实际资源站点所需 Cookie、API Key 和 Token 保留。
+
+### 7.2 发布与升级
+
+站点代码和规则跟随 fork 的应用版本发布，不再从独立二进制资源通道更新。安装与升级清理旧站点扩展，防止它们覆盖源码。前后端都使用 fork 的更新源，详见[源码站点模式](local-site-mode.md)。
 
 ### 7.3 V3 站点资源重点增加和延续了哪些能力
 
 - 站点分类增加 `music` 等 V3 媒体类别。
 - 多个 API 站点可以直接搜索音乐资源。
 - 音乐专站与综合站点的音乐分区使用同一套分类规则。
-- 继续支持并扩展 API Key、Token 等站点认证方式。
+- 继续支持实际资源站点的 API Key、Token 等访问凭据。
 - 后端用户数据解析器可以自动探测 Gazelle、NexusPHP 等站点变种。
 - 解析模板支持更完整的标题、文件名、标签和可选字段回退。
-- 构建产物覆盖 Linux、Windows、macOS、x86_64、Arm64，以及 V3t 所需的 Python 3.14t ABI。
+- 站点实现不再依赖 Python 原生扩展 ABI；当前完整运行验收以 Linux x86-64 为准。
 - [站点采集器独立 Release](https://github.com/jxxghp/MoviePilot-Site-Collector/releases/latest) 提供生成脱敏样本的程序，维护者可通过自动化流程匹配模板并创建待审核的适配 PR。
 
 ### 7.4 用户遇到站点问题时应如何判断

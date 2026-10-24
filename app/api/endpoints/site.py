@@ -11,7 +11,6 @@ from app.api.context import get_background_task_registry, resolve_background_tas
 from app.api.dependencies.auth import (
     get_current_active_manage_user,
     get_current_active_manage_user_async,
-    get_current_active_superuser,
     get_current_active_superuser_async,
     get_current_active_user_async,
 )
@@ -29,17 +28,11 @@ from app.api.response import (
     ResponseAPIRouter,
     resolve_compatible_pagination,
 )
-from app.application.commands import init_commands
 from app.application.configuration import get_configured_system_config
-from app.application.plugin.routes import register_plugin_api
-from app.application.plugin.runtime import get_plugin_manager
 from app.application.scheduling import get_scheduler
-from app.application.site.auth import normalize_site_auth_params
 from app.application.site.mutation import SiteMutationCommand
 from app.application.site.query import SiteQueryService
-
-# 站点目录由外部资源加载，静态检查无法解析其动态导出。
-from app.application.site.sites import SitesHelper  # pylint: disable=import-error,no-name-in-module
+from app.application.site.sites import SitesHelper
 from app.chain.site import SiteChain
 from app.chain.torrents import TorrentsChain
 from app.domain import site as site_rules
@@ -50,7 +43,6 @@ from app.schemas.common import JsonObject as _SchemaJsonObject
 from app.schemas.context import TorrentInfo as _SchemaTorrentInfo
 from app.schemas.response import Response as _SchemaResponse
 from app.schemas.site import Site as _SchemaSite
-from app.schemas.site import SiteAuth as _SchemaSiteAuth
 from app.schemas.site import SiteCategory as _SchemaSiteCategory
 from app.schemas.site import SiteCookieSet as _SchemaSiteCookieSet
 from app.schemas.site import SiteCookieUpdate as _SchemaSiteCookieUpdate
@@ -267,7 +259,7 @@ async def read_sites_by_media_type(
             continue
         if indexer.get("id") is not None:
             supported_ids.update(_normalize_site_ids([indexer.get("id")]))
-        domain = site_rules.extract_domain(indexer.get("domain"))
+        domain = site_rules.extract_domain(cast(str | None, indexer.get("domain")))
         if domain:
             supported_domains.add(domain)
 
@@ -515,7 +507,7 @@ def refresh_userdata(
     indexer = SitesHelper().get_indexer(site.domain)
     if not indexer:
         return _SchemaResponse(
-            success=False, message="站点不支持索引或未通过用户认证！"
+            success=False, message="站点不支持索引！"
         )
     user_data = SiteChain().refresh_userdata(site=indexer)
     if not user_data or not user_data.userid:
@@ -815,43 +807,8 @@ async def read_rss_sites(
     return [_project_readable_site(site, token_payload) for site in sites]
 
 
-@router.get("/auth", summary="查询认证站点", response_model=_SchemaJsonObject)
-async def read_auth_sites(
-    _: _SchemaTokenPayload = Depends(verify_token),
-) -> dict[str, Any]:
-    """
-    获取可认证站点列表
-    """
-    return SitesHelper().get_authsites()
 
 
-@router.post("/auth", summary="用户站点认证", response_model=_SchemaResponse[None])
-def auth_site(
-    auth_info: _SchemaSiteAuth, _: ApiPrincipal = Depends(get_current_active_superuser)
-) -> Any:
-    """
-    用户站点认证
-    """
-    if not auth_info or not auth_info.site or not auth_info.params:
-        return _SchemaResponse(success=False, message="请输入认证站点和认证参数")
-    sites_helper = SitesHelper()
-    auth_params = normalize_site_auth_params(
-        auth_info.site,
-        auth_info.params,
-        sites_helper.get_authsites(),
-    )
-    status, msg = sites_helper.check_user(auth_info.site, auth_params)
-    if status:
-        get_configured_system_config().set(
-            SystemConfigKey.UserSiteAuthParams,
-            {"site": auth_info.site, "params": auth_params},
-        )
-    # 认证成功后，重新初始化插件
-    get_plugin_manager().init_config()
-    get_scheduler().init_plugin_jobs()
-    init_commands()
-    register_plugin_api()
-    return _SchemaResponse(success=status, message=msg)
 
 
 @router.get(

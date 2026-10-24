@@ -137,65 +137,45 @@ def test_directory_config_keeps_download_path_as_downloader_path(monkeypatch):
     assert path_prompts == ["媒体库目录"]
 
 
-def test_auth_site_definitions_load_without_database_transaction_runners(
-    monkeypatch,
-):
+def test_setup_wizard_finishes_without_platform_qualification(monkeypatch):
     """
-    安装器初始化数据库之前必须能够加载静态认证字段。
+    源码安装向导完成管理员和服务配置，不收集资源站点资格凭据。
     """
-    from app.db import uow
-
     module = load_local_setup_module()
-    monkeypatch.setattr(uow, "_sync_transaction_runner", None)
-    monkeypatch.setattr(uow, "_async_transaction_runner", None)
+    prompts = []
+    monkeypatch.setattr(module, "_is_interactive", lambda: True)
+    monkeypatch.setattr(module, "print_step", lambda _message: None)
+    monkeypatch.setattr(module, "read_env_value", lambda _key: "existing-api-token-1234")
+    monkeypatch.setattr(module, "ensure_api_token", lambda **_kwargs: "existing-api-token-1234")
 
-    class AuthSitesHelper:
+    def accept_prompt(label, **_kwargs):
         """
-        通过临时工作单元执行查询，并返回静态认证结构。
+        记录向导交互，允许继续使用已有 API 令牌。
         """
+        prompts.append(label)
+        return True
 
-        def get_authsites(self) -> dict[str, object]:
-            """
-            通过临时空结果执行器读取活动站点查询。
-            """
-            assert uow.run_sync_transaction(lambda _session: "queried") == []
-            return {
-                "example": {
-                    "name": "示例站点",
-                    "params": {
-                        "cookie": {
-                            "name": "Cookie",
-                            "type": "text",
-                            "placeholder": "填写 Cookie",
-                            "tooltip": "用于站点认证",
-                            "convert": "upper",
-                        }
-                    },
-                }
-            }
+    monkeypatch.setattr(module, "_prompt_yes_no", accept_prompt)
+    monkeypatch.setattr(module, "_collect_superuser_config", lambda **_kwargs: {"SUPERUSER": "admin"})
+    monkeypatch.setattr(module, "_collect_agent_config", lambda **_kwargs: {})
+    for name in ("database", "directory", "downloader", "media_server", "notification", "autostart"):
+        monkeypatch.setattr(module, f"_collect_{name}_config", lambda: {})
+    result = module.run_setup_wizard(force_token=False)
+    assert result["env_settings"]["SUPERUSER"] == "admin"
+    assert result["api_token"] == "existing-api-token-1234"
+    assert "site_auth" not in result
+    assert prompts == ["检测到现有 API_TOKEN，是否继续使用"]
 
-    sites_module = types.ModuleType("app.application.site.sites")
-    sites_module.SitesHelper = AuthSitesHelper
-    monkeypatch.setitem(sys.modules, "app.application.site.sites", sites_module)
 
-    definitions = module._load_auth_site_definitions_inner()
-
-    assert definitions == {
-        "example": {
-            "name": "示例站点",
-            "params": {
-                "cookie": {
-                    "name": "Cookie",
-                    "type": "text",
-                    "placeholder": "填写 Cookie",
-                    "tooltip": "用于站点认证",
-                    "convert": "upper",
-                }
-            },
-        }
-    }
-    assert uow._sync_transaction_runner is None
-    assert uow._async_transaction_runner is None
+def test_retired_auth_site_cli_is_rejected(monkeypatch):
+    """
+    安装入口不再提供平台资格认证字段查询子命令。
+    """
+    module = load_local_setup_module()
+    monkeypatch.setattr(module.sys, "argv", ["local_setup.py", "query-auth-sites", "--output-json-file", "/unused"])
+    with pytest.raises(SystemExit) as error:
+        module.main()
+    assert error.value.code == 2
 
 
 def test_apply_config_does_not_create_downloader_internal_path(monkeypatch):

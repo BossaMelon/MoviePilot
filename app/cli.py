@@ -370,10 +370,8 @@ def _validate_prepared_resource_files(manifest: Dict[str, Any]) -> Path:
         for resource in resource_files
         if isinstance(resource, dict)
     }
-    if "user.sites.v3.bin" not in resource_names or not any(
-        name.startswith("sites.") for name in resource_names
-    ):
-        raise RuntimeError("站点资源更新清单不是完整资源包")
+    if resource_names != {"sites.json"} or len(resource_files) != 1:
+        raise RuntimeError("站点资源更新清单必须只包含 sites.json")
     resource_root = PREPARED_UPDATE_ROOT.resolve()
     resource_dir: Optional[Path] = None
     for resource in resource_files:

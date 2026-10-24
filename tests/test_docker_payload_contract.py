@@ -156,6 +156,10 @@ def test_update_script_keeps_new_host_entrypoint_during_runtime_migration(
     ):
         (stage_app / name).parent.mkdir(parents=True, exist_ok=True)
         (stage_app / name).write_text(content, encoding="utf-8")
+    site_dir = stage_app / "app" / "application" / "site"
+    site_dir.mkdir(parents=True)
+    (site_dir / "sites.py").write_text("# source", encoding="utf-8")
+    (site_dir / "sites.json").write_text('{"version":"1","sites":{}}', encoding="utf-8")
     (temp_dir / "dist").mkdir(parents=True)
     (temp_dir / "dist" / "index.html").write_text("ok\n", encoding="utf-8")
     python_bin = venv_dir / "bin" / "python3"
@@ -171,7 +175,6 @@ GITHUB_PROXY=""
 source {shlex.quote(str(UPDATER))}
 APP_DIR={shlex.quote(str(app_dir))}
 TMP_PATH={shlex.quote(str(temp_dir))}
-download_staged_resource() {{ return 0; }}
 stage_runtime_payload
 test "$(cat {shlex.quote(str(stage_plugins / '__init__.py'))})" = "new host"
 test -f {shlex.quote(str(stage_plugins / 'demoplugin' / '__init__.py'))}
@@ -192,7 +195,6 @@ def test_release_workflows_pin_and_record_external_payload_identities() -> None:
             "MOVIEPILOT_FRONTEND_VERSION=",
             "MOVIEPILOT_FRONTEND_SHA256=",
             "MOVIEPILOT_PLUGINS_REF=",
-            "MOVIEPILOT_RESOURCES_REF=",
         ):
             assert build_arg in workflow
 
@@ -201,14 +203,18 @@ def test_release_workflows_pin_and_record_external_payload_identities() -> None:
             "org.moviepilot.frontend-version=",
             "org.moviepilot.frontend-digest=",
             "org.moviepilot.plugins-revision=",
-            "org.moviepilot.resources-revision=",
+            "org.moviepilot.site-index-source-revision=",
             "org.moviepilot.plugin-market-wiki-revision=",
             "org.moviepilot.models-catalog-digest=",
         ):
             assert label in workflow
 
         assert "git ls-remote https://github.com/jxxghp/MoviePilot-Plugins.git" in workflow
-        assert "git ls-remote https://github.com/jxxghp/MoviePilot-Resources.git" in workflow
+        assert "MoviePilot-Resources" not in workflow
+        assert "resources_revision" not in workflow
+        assert "MOVIEPILOT_RESOURCES_REF" not in workflow
+        assert "org.moviepilot.site-index-source-revision=${{ env.SOURCE_COMMIT }}" in workflow
+        assert "repos/BossaMelon/MoviePilot-Frontend/" in workflow
         assert "sha256:*) frontend_sha256=" in workflow
         assert "^[0-9a-f]{40}$" in workflow
         assert "^[0-9a-f]{64}$" in workflow
@@ -228,7 +234,8 @@ def test_same_version_rebuild_identity_is_not_derived_from_image_tag() -> None:
     )
     assert "type=raw,value=${{ env.app_version }}" in release_workflow
     assert "MOVIEPILOT_PLUGINS_REF=${{ steps.payloads.outputs.plugins_revision }}" in release_workflow
-    assert "MOVIEPILOT_RESOURCES_REF=${{ steps.payloads.outputs.resources_revision }}" in release_workflow
+    assert "org.moviepilot.site-index-source-revision=${{ env.SOURCE_COMMIT }}" in release_workflow
+    assert "MOVIEPILOT_RESOURCES_REF" not in release_workflow
 
 
 def test_custom_frontend_directory_is_stable_but_artifacts_remain_untracked() -> None:
@@ -244,3 +251,19 @@ def test_custom_frontend_directory_is_stable_but_artifacts_remain_untracked() ->
     assert ".artifacts/" in gitignore
     assert "COPY frontend-dist/ /tmp/frontend-dist/" in dockerfile
     assert "! -name '.gitkeep'" in dockerfile
+
+
+def test_site_index_payload_is_owned_by_backend_source() -> None:
+    """
+    站点索引由应用源码交付，基础镜像中旧认证文件必须先删除。
+    """
+    dockerfile = _read(DOCKERFILE)
+    resource_stage = dockerfile.split("FROM prepare_payload AS prepare_resources", 1)[1].split("# 准备容器控制面", 1)[0]
+    assert "COPY app/application/site/sites.json /resources/sites.json" in resource_stage
+    assert "curl" not in resource_stage
+    assert "MOVIEPILOT_RESOURCES_REF" not in dockerfile
+    overlay = _read(ROOT / "docker" / "Dockerfile.local-site-mode")
+    removal = overlay.split("COPY app/", 1)[0]
+    for pattern in ('sites*.so*', 'sites*.pyd', 'user.sites*.bin', 'sites.pyi', 'auth.py'):
+        assert f'-name "{pattern}"' in removal
+    assert "COPY app/ /app/app/" in overlay

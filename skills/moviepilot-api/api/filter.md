@@ -26,7 +26,7 @@ Purpose: 创建一条自定义种子过滤规则。
 Identity scope: `admin`; required role: `system_admin`.
 - `path_params`: none
 - `query`: none
-- `body`: `exclude` (string|null): 排除; `include` (string|null): 包含; `name*` (string): 显示名称; `publish_time` (string|null): 发布时间; `rule_id*` (string): 新建过滤规则的唯一标识; `seeders` (string|null): 允许的最少做种人数; `size_range` (string|null): 大小范围（MB）
+- `body`: `exclude` (string|null): 排除; `include` (string|null): 包含; `name*` (string): 显示名称; `publish_time` (string|null): 距离发布经过的分钟数；单值为最小等待时间，区间表示允许的时间范围; `rule_id*` (string): 新建过滤规则的唯一标识; `seeders` (string|null): 允许的最少做种人数; `size_range` (string|null): 单集平均文件大小范围，单位为 MiB；a-b、>a、<a 均包含边界，空值不限制
 
 ### `filter.custom.delete`
 `DELETE /api/v1/rule/custom/{rule_id}`; policy effect: `destructive_write`.
@@ -42,7 +42,7 @@ Purpose: 更新一条自定义种子过滤规则。
 Identity scope: `admin`; required role: `system_admin`.
 - `path_params`: `rule_id*` (string): 自定义过滤规则的稳定标识。
 - `query`: none
-- `body`: `exclude` (string|null): 排除; `include` (string|null): 包含; `name` (string|null): 显示名称; `new_rule_id` (string|null): 修改后的规则标识; `publish_time` (string|null): 发布时间; `seeders` (string|null): 允许的最少做种人数; `size_range` (string|null): 大小范围（MB）
+- `body`: `exclude` (string|null): 排除; `include` (string|null): 包含; `name` (string|null): 显示名称; `new_rule_id` (string|null): 修改后的规则标识; `publish_time` (string|null): 距离发布经过的分钟数；单值为最小等待时间，区间表示允许的时间范围; `seeders` (string|null): 允许的最少做种人数; `size_range` (string|null): 单集平均文件大小范围，单位为 MiB；a-b、>a、<a 均包含边界，空值不限制
 
 ### `filter.group.add`
 `POST /api/v1/rule/groups`; policy effect: `reversible_write`.
@@ -156,12 +156,12 @@ This category document is self-contained: the shared models below are included s
 - `drive_id` (string|null): 云盘驱动器标识
 - `extension` (string|null): 文件后缀
 - `fileid` (string|null): 存储服务分配的文件标识
-- `modify_time` (number|null): 文件修改时间的 Unix 时间戳
+- `modify_time` (number|null): 文件修改时间的 Unix 时间戳，单位为秒，未提供时为 None
 - `name` (string|null): 文件名
 - `parent_fileid` (string|null): 父ID
 - `path` (string|null; default `/`): 文件路径
 - `pickcode` (string|null): 115 文件下载提取码
-- `size` (integer|null): 文件大小
+- `size` (integer|null): 文件大小，单位为字节；目录或来源未提供时可为 None
 - `storage` (string|null; default `local`): 存储类型，默认 local 表示本地存储
 - `thumbnail` (string|null): 缩略图
 - `type` (string|null): 条目类型，dir 表示目录，file 表示文件
@@ -197,7 +197,7 @@ This runtime model has no directly writable fields.
 - `category` (string|null): 种子分类 电影/电视剧/音乐
 - `date_elapsed` (string|null): 已过时间
 - `description` (string|null): 种子副标题
-- `downloadvolumefactor` (number|null): 下载因子
+- `downloadvolumefactor` (number|null): 下载统计倍率，例如 0 表示免费下载、0.5 表示按一半下载量计入统计
 - `enclosure` (string|null): 种子链接
 - `freedate` (string|null): 免费截止时间
 - `freedate_diff` (string|null): 剩余免费时间
@@ -218,9 +218,9 @@ This runtime model has no directly writable fields.
 - `site_order` (integer|null; default `0`): 站点优先级
 - `site_proxy` (boolean|null; default `False`): 站点是否使用代理
 - `site_ua` (string|null): 站点UA
-- `size` (number|null; default `0.0`): 种子大小
+- `size` (number|null; default `0.0`): 种子包含的文件总大小，单位为字节
 - `title` (string|null): 种子名称
-- `uploadvolumefactor` (number|null): 上传因子
+- `uploadvolumefactor` (number|null): 上传统计倍率，例如 2 表示按实际上传量的两倍计入站点统计
 - `volume_factor` (string|null): 促销
 
 ### `WorkflowExecutionConfig`

@@ -316,45 +316,10 @@ function recover_pending_update() {
     INFO "→ 未完成的容器更新事务已恢复"
 }
 
-function existing_resource_dir() {
-    local resource_source_dir="${APP_DIR}/app/application/site"
-    for legacy_resource_dir in "${APP_DIR}/app/infrastructure" "${APP_DIR}/app/adapters/network" "${APP_DIR}/app/helper"; do
-        if [ ! -d "${resource_source_dir}" ] && [ -d "${legacy_resource_dir}" ]; then
-            resource_source_dir="${legacy_resource_dir}"
-        fi
-    done
-    printf '%s\n' "${resource_source_dir}"
-}
-
-function download_staged_resource() {
-    local url="$1"
-    local destination="$2"
-    local fallback="$3"
-    local label="$4"
-
-    if curl ${CURL_OPTIONS} --fail "${url}" -o "${destination}" \
-        && [ -s "${destination}" ]; then
-        return 0
-    fi
-    rm -f "${destination}"
-    if [ -f "${fallback}" ]; then
-        cp -a "${fallback}" "${destination}"
-        return $?
-    fi
-    ERROR "${label} 下载失败且没有可用旧资源"
-    return 1
-}
-
 function stage_runtime_payload() {
     local stage_app="${TMP_PATH}/App"
     local stage_plugin_dir="${stage_app}/app/plugins"
     local stage_resource_dir="${stage_app}/app/application/site"
-    local resource_source_dir
-    local resource_file
-    local python_version
-    local arch
-    local arch_suffix
-    local sites_file
 
     [ -f "${stage_app}/version.py" ] || return 1
     [ -f "${stage_app}/pyproject.toml" ] || return 1
@@ -382,35 +347,10 @@ function stage_runtime_payload() {
         return 1
     fi
 
-    resource_source_dir="$(existing_resource_dir)"
-    mkdir -p "${stage_resource_dir}" || return 1
-    if [ -f "${resource_source_dir}/user.sites.v3.bin" ] \
-        && ! cp -a "${resource_source_dir}/user.sites.v3.bin" "${stage_resource_dir}/"; then
-        return 1
-    fi
-    for resource_file in "${resource_source_dir}"/sites.cp*; do
-        [ -f "${resource_file}" ] || continue
-        cp -a "${resource_file}" "${stage_resource_dir}/" || return 1
-    done
+    # 拒绝缺少源码索引的新载荷，不迁移旧站点二进制。
+    [ -f "${stage_resource_dir}/sites.py" ] || return 1
+    [ -f "${stage_resource_dir}/sites.json" ] || return 1
 
-    python_version="$("${VENV_PATH}/bin/python3" -c 'import sys, sysconfig; print(f"cpython-{sys.version_info.major}{sys.version_info.minor}{"t" if sysconfig.get_config_var("Py_GIL_DISABLED") == 1 else ""}")')" || return 1
-    arch="$(uname -m)"
-    if [ "${arch}" = "aarch64" ]; then
-        arch_suffix="aarch64-linux-gnu"
-    else
-        arch_suffix="x86_64-linux-gnu"
-    fi
-    sites_file="sites.${python_version}-${arch_suffix}.so"
-    download_staged_resource \
-        "${GITHUB_PROXY}https://raw.githubusercontent.com/jxxghp/MoviePilot-Resources/main/resources.v3/user.sites.v3.bin" \
-        "${stage_resource_dir}/user.sites.v3.bin" \
-        "${resource_source_dir}/user.sites.v3.bin" \
-        "user.sites.v3.bin" || return 1
-    download_staged_resource \
-        "${GITHUB_PROXY}https://raw.githubusercontent.com/jxxghp/MoviePilot-Resources/main/resources.v3/${sites_file}" \
-        "${stage_resource_dir}/${sites_file}" \
-        "${resource_source_dir}/${sites_file}" \
-        "${sites_file}" || return 1
 }
 
 function swap_staged_payload() {
@@ -428,7 +368,7 @@ function swap_staged_payload() {
 
 # 下载程序资源，$1: 后端版本路径
 function install_backend_and_download_resources() {
-    if ! download_and_unzip "${GITHUB_PROXY}https://github.com/jxxghp/MoviePilot/archive/refs/${1}" "App"; then
+    if ! download_and_unzip "${GITHUB_PROXY}https://github.com/BossaMelon/MoviePilot/archive/refs/${1}" "App"; then
         WARN "后端程序下载失败，继续使用旧的程序来启动..."
         return 1
     fi
@@ -454,7 +394,7 @@ function install_backend_and_download_resources() {
     # 如果是"heads/v3.zip"，则查找v3开头的最新版本号
     if [[ "${1}" == "heads/v3.zip" ]]; then
         INFO "→ 正在获取前端最新版本号..."
-        releases=$(curl ${CURL_OPTIONS} "https://api.github.com/repos/jxxghp/MoviePilot-Frontend/releases" ${CURL_HEADERS} | jq -r '.[].tag_name' | grep "^v3\.")
+        releases=$(curl ${CURL_OPTIONS} "https://api.github.com/repos/BossaMelon/MoviePilot-Frontend/releases" ${CURL_HEADERS} | jq -r '.[].tag_name' | grep "^v3\.")
         if [ -z "$releases" ]; then
             WARN "未找到任何v3前端版本，继续启动..."
             return 1
@@ -472,7 +412,7 @@ function install_backend_and_download_resources() {
         fi
         INFO "前端版本号：${frontend_version}"
     fi
-    if ! download_and_unzip "${GITHUB_PROXY}https://github.com/jxxghp/MoviePilot-Frontend/releases/download/${frontend_version}/dist.zip" "dist"; then
+    if ! download_and_unzip "${GITHUB_PROXY}https://github.com/BossaMelon/MoviePilot-Frontend/releases/download/${frontend_version}/dist.zip" "dist"; then
         WARN "前端程序下载失败，继续使用旧的程序来启动..."
         return 1
     fi
