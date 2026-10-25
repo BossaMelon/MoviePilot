@@ -271,14 +271,15 @@ class SitesHelper:
 
     def check(self, domain: str) -> tuple[bool, str]:
         """
-        按用户站点配置执行流控，不检查任何平台资格。
+        按用户站点配置执行流控，返回是否阻断及原因，不检查平台资格。
         """
         repository = self._repository()
         site = repository.get_by_domain(extract_domain(domain)) if repository is not None else None
         if site is None:
-            return True, ""
-        return _limiter.check_rate_limit(extract_domain(domain), site.limit_interval or 0,
-                                         site.limit_count or 0, site.limit_seconds or 0)
+            return False, ""
+        allowed, message = _limiter.check_rate_limit(extract_domain(domain), site.limit_interval or 0,
+                                                     site.limit_count or 0, site.limit_seconds or 0)
+        return not allowed, message
 
     @staticmethod
     def get_authsites() -> dict[str, JsonData]:

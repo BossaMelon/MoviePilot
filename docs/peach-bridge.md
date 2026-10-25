@@ -5,7 +5,8 @@ MP 负责番号站点搜索及手动提交下载，Peach 负责文件识别、�
 
 ## 部署配置
 
-- `PEACH_URL`：Peach 服务的 HTTP(S) 地址。
+- `PEACH_URL`：MP 后端请求 Peach 的内部 HTTP(S) 地址，专用令牌仅发送到此地址。
+- `PEACH_PUBLIC_URL`：可选的浏览器访问 HTTP(S) 地址；留空沿用 `PEACH_URL`。例如容器内配置 `PEACH_URL=http://peach:8900`，SSH 转发访问时配置 `PEACH_PUBLIC_URL=http://127.0.0.1:18900`。馆藏链接先验证属于内部地址，再转换为浏览器地址；两种地址均不接受凭据、查询参数或片段。
 - `PEACH_TOKEN`：对应 Peach 的 `PEACH_MOVIEPILOT_TOKEN`，使用独立随机密钥。
 - `PEACH_DOWNLOAD_ROOT`：MP 与下载器能写入的本地绝对专用目录。
 - Peach 的 `PEACH_MOVIEPILOT_IMPORT_ROOT` 必须映射到同一份共享文件内容。

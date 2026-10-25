@@ -554,3 +554,62 @@ def test_chain_rejects_legacy_completed_state_without_confirmed_fact(bridge, mon
                             state="completed", content_path=bridge.port.path)
     monkeypatch.setattr(chain_module, "DownloadChain", lambda: SimpleNamespace(list_torrents=lambda **kwargs: [dto]))
     assert not chain_module.PeachBridgeChain(SimpleNamespace()).completion(bridge.store.records()[0]).complete
+
+
+@pytest.mark.parametrize("link,expected", [
+    ("/assets/1", "http://localhost:18900/assets/1"),
+    ("http://peach.test/assets/1", "http://localhost:18900/assets/1"),
+    ("//evil.test/assets/1", None),
+    ("http://user@peach.test/assets/1", None),
+    ("http://peach.test/assets/1?secret=1", None),
+    ("http://peach.test/assets/1#fragment", None),
+    ("http://peach.test/assets/1?", None),
+    ("https://peach.test/assets/1", None),
+    ("/assets/1#", None),
+    ("/assets/1?", None),
+    ("http://@peach.test/assets/1", None),
+])
+def test_http_library_rewrites_valid_internal_links(link, expected):
+    """
+    浏览器地址只替换已通过内部同源校验的馆藏链接。
+    """
+    client = PeachHttpClient("http://peach.test", "private", "http://localhost:18900")
+    calls = []
+
+    def get_res(url, **kwargs):
+        """
+        捕获真实请求目标并返回受控馆藏响应。
+        """
+        calls.append((url, kwargs))
+        return SimpleNamespace(status_code=200, json=lambda: {"items": [
+            {"id": "1", "code": "ABC-123", "title": "fixture", "peach_url": link}]})
+
+    client.transport = SimpleNamespace(get_res=get_res)
+    assert client.library(None).items[0].peach_url == expected
+    assert calls == [("http://peach.test/api/integrations/moviepilot/library", {
+        "params": None, "allow_redirects": False})]
+
+
+@pytest.mark.parametrize("url", [
+    "ftp://public.test", "http://user:secret@public.test", "http://public.test/?x=1",
+    "http://public.test/#x", "http://public.test:invalid", "http://public.test/?",
+])
+def test_http_client_rejects_invalid_public_url(url):
+    """
+    无效浏览器地址在构造客户端时拒绝，避免产生不安全链接。
+    """
+    with pytest.raises(ValueError):
+        PeachHttpClient("http://peach.test", "private", url)
+
+
+def test_http_client_token_stays_on_internal_transport(monkeypatch):
+    """
+    浏览器地址不改变令牌传输目标，留空时保留既有馆藏地址。
+    """
+    from app.adapters.external.peach import client as client_module
+    captured = []
+    monkeypatch.setattr(client_module, "RequestUtils", lambda **kwargs: captured.append(kwargs) or SimpleNamespace())
+    client = PeachHttpClient("http://peach.test", "private", "http://localhost:18900")
+    assert client.url == "http://peach.test/api/integrations/moviepilot"
+    assert captured[0]["headers"] == {"Authorization": "Bearer private"}
+    assert PeachHttpClient("http://peach.test", "private", "").public_origin == "http://peach.test/"

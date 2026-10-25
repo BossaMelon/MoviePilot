@@ -3,7 +3,7 @@
 """
 
 from typing import Optional
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from app.adapters.network.http import RequestUtils
 from app.schemas.peach import BridgeRecord, PeachLibraryData
@@ -14,16 +14,29 @@ class PeachHttpClient:
     使用专用 Bearer 令牌连接管理员配置的 Peach 服务。
     """
 
-    def __init__(self, url: str, token: str):
+    def __init__(self, url: str, token: str, public_url: Optional[str] = None):
         """
-        验证服务 URL，不接受用户信息、查询参数和片段。
+        分别验证内部请求地址与浏览器地址，令牌只用于内部接口。
+        """
+        self.origin = self._validate_base(url)
+        self.public_origin = self._validate_base(public_url) if public_url else self.origin
+        self.url = self.origin.rstrip("/") + "/api/integrations/moviepilot"
+        self.transport = RequestUtils(headers={"Authorization": f"Bearer {token}"}, timeout=20)
+
+    @staticmethod
+    def _validate_base(url: str) -> str:
+        """
+        限制地址为无凭据、查询或片段的有效 HTTP(S) 基址。
         """
         parsed = urlsplit(url)
-        if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+        if (parsed.scheme not in ("http", "https") or not parsed.hostname
+                or "@" in parsed.netloc or parsed.query or parsed.fragment
+                or "?" in url or "#" in url or "\\" in url
+                or any(char.isspace() or ord(char) < 32 for char in url)):
             raise ValueError("Peach 地址格式无效")
-        self.origin = url.rstrip("/") + "/"
-        self.url = url.rstrip("/") + "/api/integrations/moviepilot"
-        self.transport = RequestUtils(headers={"Authorization": f"Bearer {token}"}, timeout=20)
+        # 同时触发非法端口校验，避免请求阶段才暴露配置错误。
+        _ = parsed.port
+        return url.rstrip("/") + "/"
 
     def normalize_code(self, code: str) -> str:
         """
@@ -82,11 +95,18 @@ class PeachHttpClient:
         data = PeachLibraryData.model_validate(response.json())
         for item in data.items:
             if item.peach_url:
-                link = urljoin(self.origin, item.peach_url)
-                parsed = urlsplit(link)
-                if (parsed.netloc != urlsplit(self.origin).netloc or parsed.scheme != urlsplit(self.origin).scheme
-                        or parsed.username or parsed.password or parsed.query or parsed.fragment):
+                try:
+                    if any(char in item.peach_url for char in ("?", "#", "\\")) or any(
+                            char.isspace() or ord(char) < 32 for char in item.peach_url):
+                        raise ValueError("Peach 馆藏链接格式无效")
+                    link = urljoin(self.origin, item.peach_url)
+                    self._validate_base(link)
+                    parsed = urlsplit(link)
+                    internal = urlsplit(self.origin)
+                    if (parsed.scheme, parsed.hostname, parsed.port) != (internal.scheme, internal.hostname, internal.port):
+                        raise ValueError("Peach 馆藏链接来源无效")
+                    public = urlsplit(self.public_origin)
+                    item.peach_url = urlunsplit((public.scheme, public.netloc, parsed.path, "", ""))
+                except ValueError:
                     item.peach_url = None
-                else:
-                    item.peach_url = link
         return data

@@ -608,6 +608,7 @@ class ConfigModel(BaseModel):
     # 服务地址配置
     # Peach 桥接服务地址，仅由管理员配置，不随候选返回浏览器。
     PEACH_URL: Optional[str] = Field(default=None, description="Peach 服务地址")
+    PEACH_PUBLIC_URL: Optional[str] = Field(default=None, description="Peach 浏览器访问地址，留空沿用服务地址")
     # Peach 专用集成密钥，不使用站点 Cookie 或管理员登录令牌。
     PEACH_TOKEN: Optional[str] = Field(default=None, description="Peach 专用集成令牌")
     # Peach 独占的本地下载根目录，不允许与普通媒体目录重叠。

@@ -30,7 +30,7 @@ def build_peach_bridge() -> PeachBridgeService:
             if root.resolve().is_relative_to(ordinary) or ordinary.is_relative_to(root.resolve()):
                 raise ValueError("Peach 专用下载目录不能与普通媒体下载目录重叠")
     return PeachBridgeService(
-        port=PeachBridgeChain(PeachHttpClient(peach_url, peach_token)),
+        port=PeachBridgeChain(PeachHttpClient(peach_url, peach_token, get_runtime_setting("PEACH_PUBLIC_URL"))),
         store=JsonBridgeStore(get_runtime_setting("CONFIG_PATH") / "peach-bridge" / "state.json"), root=root,
     )
 

@@ -155,3 +155,35 @@ def test_retired_platform_auth_operations_are_not_advertised():
     retired = {"site.auth.options", "site.authenticate"}
     assert retired.isdisjoint(API_OPERATION_ROUTES)
     assert retired.isdisjoint(spec.operation_id for spec in API_OPERATION_SPECS)
+
+
+@pytest.mark.parametrize("configured", ["missing_repository", "missing_site", "unlimited"])
+def test_real_indexer_search_check_allows_unlimited_sites(catalog, monkeypatch, configured):
+    """
+    真实索引器将目录检查的假值解释为未阻断，无配置和无限额站点均可搜索。
+    """
+    from app.modules import indexer
+
+    site = SiteSnapshot(id=1, name="测试站点", domain="fixture.example", url="https://fixture.example/")
+    repository = (SimpleNamespace(get_by_domain=lambda domain: site if configured == "unlimited" else None)
+                  if configured != "missing_repository" else None)
+    helper = catalog.SitesHelper(repository=repository)
+    monkeypatch.setattr(indexer, "SitesHelper", lambda: helper)
+    assert indexer.IndexerModule._IndexerModule__search_check({"domain": "https://fixture.example/"}, "ABC-123")
+    assert helper.check("fixture.example") == (False, "")
+
+
+def test_real_indexer_search_check_blocks_only_exhausted_limit(catalog, monkeypatch):
+    """
+    使用真实源码目录和索引器消费协议，首次搜索放行而额度耗尽后阻断。
+    """
+    from app.modules import indexer
+
+    site = SiteSnapshot(id=1, name="测试站点", domain="fixture.example", url="https://fixture.example/", limit_interval=60, limit_count=1)
+    helper = catalog.SitesHelper(repository=SimpleNamespace(get_by_domain=lambda domain: site))
+    monkeypatch.setattr(indexer, "SitesHelper", lambda: helper)
+    check = indexer.IndexerModule._IndexerModule__search_check
+    assert check({"domain": "https://fixture.example/"}, "ABC-123")
+    assert not check({"domain": "https://fixture.example/"}, "ABC-123")
+    blocked, message = helper.check("fixture.example")
+    assert blocked and message
